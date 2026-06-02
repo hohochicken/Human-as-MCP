@@ -17,5 +17,5 @@ echo Press Ctrl+C to stop.
 echo ============================================
 echo.
 
-python server/main.py
+C:\Python313\python.exe server/main.py
 pause

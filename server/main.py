@@ -37,7 +37,7 @@ async def main():
     print("Press Ctrl+C to stop.")
     print()
 
-    app.run(transport="streamable-http", host="127.0.0.1", port=4350)
+    await app.run_async(transport="streamable-http", host="127.0.0.1", port=4350)
 
 
 if __name__ == "__main__":

@@ -1044,32 +1044,16 @@ def _register_custom_routes() -> None:
     """Register HTTP/WebSocket routes and static-file mount with FastMCP's
     underlying Starlette application.
 
-    Raises ``RuntimeError`` if the Starlette app cannot be located, so the
-    server fails fast rather than silently starting without HTTP routes.
+    Uses FastMCP's built-in ``_additional_http_routes`` list which is
+    consumed by ``http_app()`` every time it builds the Starlette app,
+    ensuring routes survive across the full app lifecycle.
     """
     custom_routes = _build_routes()
 
-    # Try to obtain the Starlette app from the FastMCP instance.
-    starlette_app = None
-    for attr in ("_app", "app", "_http_app", "http_app", "_asgi_app"):
-        try:
-            candidate = getattr(mcp, attr, None)
-            if candidate is not None and hasattr(candidate, "routes"):
-                starlette_app = candidate
-                break
-        except Exception:
-            continue
-
-    if starlette_app is None:
-        raise RuntimeError(
-            "Could not locate the underlying Starlette app on the FastMCP "
-            "instance. HTTP routes, WebSocket, Dashboard, and Health endpoint "
-            "will NOT be available. Check your FastMCP version compatibility."
-        )
-
-    # Insert our routes at the front so they take priority over MCP internals.
-    for route in reversed(custom_routes):
-        starlette_app.routes.insert(0, route)
+    # FastMCP >=2.12 maintains a list of additional HTTP routes that are
+    # always included when building the Starlette app.  This is the only
+    # reliable way to add routes without losing them on rebuild.
+    mcp._additional_http_routes.extend(custom_routes)
 
     logger.info("Custom HTTP routes and WebSocket registered (%d routes).", len(custom_routes))
     for r in custom_routes:
