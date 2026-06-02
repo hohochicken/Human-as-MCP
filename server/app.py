@@ -147,8 +147,9 @@ ws_clients: set = set()  # Connected WebSocket clients
 _agent_last_seen: dict[str, str] = {}
 
 # Active MCP client SSE sessions for push notifications.
-# Each entry is an (event_queue) that accepts server→client notification dicts.
-_mcp_sessions: list[asyncio.Queue] = []
+# Dict keyed by agent_id → list of asyncio.Queue for that agent's sessions.
+# An agent may have multiple sessions (e.g. reconnects, parallel tabs).
+_mcp_sessions: dict[str, list[asyncio.Queue]] = {}
 
 # ---------------------------------------------------------------------------
 # WebSocket broadcast
@@ -235,34 +236,50 @@ async def _inject_piggyback(result: dict, agent_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def register_mcp_session() -> asyncio.Queue:
-    """Create and register a new MCP client session queue.
+def register_mcp_session(agent_id: str) -> asyncio.Queue:
+    """Create and register a new MCP client session queue for *agent_id*.
 
-    Returns an async queue that callers should consume from.
-    Call ``unregister_mcp_session(q)`` when the session ends.
+    Returns an async queue.  Call ``unregister_mcp_session(agent_id, q)``
+    when the session ends.
     """
     q: asyncio.Queue = asyncio.Queue()
-    _mcp_sessions.append(q)
-    logger.debug("MCP session registered (%d active).", len(_mcp_sessions))
+    _mcp_sessions.setdefault(agent_id, []).append(q)
+    total = sum(len(v) for v in _mcp_sessions.values())
+    logger.debug(
+        "MCP session registered: agent=%s (%d total sessions across %d agents).",
+        agent_id, total, len(_mcp_sessions),
+    )
     return q
 
 
-def unregister_mcp_session(q: asyncio.Queue) -> None:
+def unregister_mcp_session(agent_id: str, q: asyncio.Queue) -> None:
     """Remove a previously registered MCP session queue."""
-    _mcp_sessions[:] = [s for s in _mcp_sessions if s is not q]
-    logger.debug("MCP session unregistered (%d remaining).", len(_mcp_sessions))
+    queues = _mcp_sessions.get(agent_id, [])
+    if q in queues:
+        queues.remove(q)
+    if not queues:
+        _mcp_sessions.pop(agent_id, None)
+    total = sum(len(v) for v in _mcp_sessions.values())
+    logger.debug(
+        "MCP session unregistered: agent=%s (%d total sessions remaining).",
+        agent_id, total,
+    )
 
 
 async def push_to_mcp_sessions(notification: dict) -> None:
-    """Push a notification to all active MCP client sessions.
+    """Push a notification to the MCP sessions of the agent who owns the task.
 
-    Sessions that are full (consumers too slow) are silently dropped.
+    Notification must include ``agent_id`` — only sessions registered under
+    that agent receive the push.  Other agents' sessions are never notified
+    about tasks they don't own.
     """
-    if not _mcp_sessions:
+    agent_id = notification.get("agent_id", "")
+    if not agent_id or agent_id not in _mcp_sessions:
         return
 
+    queues = _mcp_sessions[agent_id]
     stale: list[asyncio.Queue] = []
-    for q in _mcp_sessions:
+    for q in queues:
         try:
             q.put_nowait(notification)
         except asyncio.QueueFull:
@@ -271,12 +288,12 @@ async def push_to_mcp_sessions(notification: dict) -> None:
             stale.append(q)
 
     for q in stale:
-        unregister_mcp_session(q)
+        unregister_mcp_session(agent_id, q)
 
     if notification.get("type") == "task_completed":
         logger.info(
-            "Pushed task_completed notification to %d MCP session(s): task_id=%s",
-            len(_mcp_sessions) - len(stale),
+            "Pushed task_completed to agent=%s (%d session(s)): task_id=%s",
+            agent_id, len(queues) - len(stale),
             notification.get("task_id"),
         )
 
@@ -759,6 +776,7 @@ async def handle_api_task_complete(request: Any) -> Any:
         "task_id": task_id,
         "status": "completed",
         "title": task.get("title", ""),
+        "agent_id": task.get("agent_id", ""),
         "completed_at": task.get("completed_at"),
     })
 
@@ -802,6 +820,7 @@ async def handle_api_task_reject(request: Any) -> Any:
         "task_id": task_id,
         "status": "rejected",
         "title": task.get("title", ""),
+        "agent_id": task.get("agent_id", ""),
         "rejection_reason": task.get("rejection_reason"),
         "completed_at": task.get("completed_at"),
     })
