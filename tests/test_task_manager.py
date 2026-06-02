@@ -10,12 +10,14 @@ from server.task_manager import TaskManager
 def mock_storage():
     """Return a mock Storage with async methods."""
     storage = MagicMock()
-    storage.save_task = MagicMock()
-    storage.get_task = MagicMock(return_value=None)
-    storage.get_tasks_by_status = MagicMock(return_value=[])
-    storage.get_history_tasks = MagicMock(return_value=[])
-    storage.update_task = MagicMock()
-    storage.get_task_counts = MagicMock(return_value={
+    storage.save_task = AsyncMock()
+    storage.get_task = AsyncMock(return_value=None)
+    storage.get_tasks_by_status = AsyncMock(return_value=[])
+    storage.get_history_tasks = AsyncMock(return_value=[])
+    storage.update_task = AsyncMock()
+    storage.get_tasks_completed_since = AsyncMock(return_value=[])
+    storage.list_tasks = AsyncMock(return_value=[])
+    storage.get_task_counts = AsyncMock(return_value={
         "pending": 0, "completed": 0, "rejected": 0, "total": 0,
     })
     return storage

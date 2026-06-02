@@ -99,7 +99,7 @@ class TaskManager:
         )
 
         # Persist via storage backend.
-        self._storage.save_task(task)
+        await self._storage.save_task(task)
 
         logger.info(
             "Task created: id=%s title=%r tool=%s priority=%s agent=%s",
@@ -116,21 +116,21 @@ class TaskManager:
 
     async def get_task(self, task_id: str) -> Optional[dict]:
         """Return the task dictionary for *task_id*, or ``None`` if not found."""
-        task = self._storage.get_task(task_id)
+        task = await self._storage.get_task(task_id)
         if task is None:
             return None
         return task.to_dict()
 
     async def get_pending_tasks(self) -> list[dict]:
         """Return all tasks currently in ``pending`` status, sorted newest-first."""
-        tasks = self._storage.get_tasks_by_status(TaskStatus.PENDING)
+        tasks = await self._storage.get_tasks_by_status(TaskStatus.PENDING)
         return [t.to_dict() for t in tasks]
 
     async def get_history_tasks(
         self, limit: int = 100, offset: int = 0
     ) -> list[dict]:
         """Return completed/rejected tasks with pagination, newest-first."""
-        tasks = self._storage.get_history_tasks(limit=limit, offset=offset)
+        tasks = await self._storage.get_history_tasks(limit=limit, offset=offset)
         return [t.to_dict() for t in tasks]
 
     async def list_tasks(
@@ -154,7 +154,7 @@ class TaskManager:
             ISO-8601 timestamp; only tasks with ``created_at > since``
             or ``completed_at > since`` are returned.
         """
-        tasks = self._storage.list_tasks(
+        tasks = await self._storage.list_tasks(
             status=status,
             agent_id=agent_id,
             limit=limit,
@@ -168,7 +168,7 @@ class TaskManager:
         agent_id: str | None = None,
     ) -> list[dict]:
         """Return tasks completed/rejected after *since*, for piggyback injection."""
-        tasks = self._storage.get_tasks_completed_since(
+        tasks = await self._storage.get_tasks_completed_since(
             since=since, agent_id=agent_id,
         )
         return [t.to_dict() for t in tasks]
@@ -182,7 +182,7 @@ class TaskManager:
 
         Raises ``ValueError`` if the task does not exist or is not pending.
         """
-        task = self._storage.get_task(task_id)
+        task = await self._storage.get_task(task_id)
         if task is None:
             raise ValueError(f"Task not found: {task_id}")
         if task.status != TaskStatus.PENDING:
@@ -195,7 +195,7 @@ class TaskManager:
         task.evidence = evidence or []
         task.completed_at = datetime.now(timezone.utc).isoformat()
 
-        self._storage.update_task(task)
+        await self._storage.update_task(task)
 
         logger.info("Task completed: id=%s", task_id)
         return task.to_dict()
@@ -207,7 +207,7 @@ class TaskManager:
 
         Raises ``ValueError`` if the task does not exist or is not pending.
         """
-        task = self._storage.get_task(task_id)
+        task = await self._storage.get_task(task_id)
         if task is None:
             raise ValueError(f"Task not found: {task_id}")
         if task.status != TaskStatus.PENDING:
@@ -223,7 +223,7 @@ class TaskManager:
         task.rejection_reason = mapped
         task.rejection_note = note or ""
 
-        self._storage.update_task(task)
+        await self._storage.update_task(task)
 
         logger.info("Task rejected: id=%s reason=%s", task_id, mapped.value if mapped else reason)
         return task.to_dict()
@@ -234,7 +234,7 @@ class TaskManager:
         Marks ``cancel_requested=True`` so the human can confirm via the
         dashboard.
         """
-        task = self._storage.get_task(task_id)
+        task = await self._storage.get_task(task_id)
         if task is None:
             raise ValueError(f"Task not found: {task_id}")
 
@@ -243,7 +243,7 @@ class TaskManager:
         if reason:
             task.cancel_new_data = {"reason": reason}
 
-        self._storage.update_task(task)
+        await self._storage.update_task(task)
 
         logger.info("Task cancel requested: id=%s", task_id)
         return task.to_dict()
@@ -253,7 +253,7 @@ class TaskManager:
 
         Transitions the task to ``rejected`` with reason ``ai_can_do``.
         """
-        task = self._storage.get_task(task_id)
+        task = await self._storage.get_task(task_id)
         if task is None:
             raise ValueError(f"Task not found: {task_id}")
         if not task.cancel_requested:
@@ -265,7 +265,7 @@ class TaskManager:
         task.completed_at = datetime.now(timezone.utc).isoformat()
         task.cancel_requested = False
 
-        self._storage.update_task(task)
+        await self._storage.update_task(task)
 
         logger.info("Task cancel confirmed: id=%s", task_id)
         return task.to_dict()
@@ -275,7 +275,7 @@ class TaskManager:
 
         Allowed keys: ``title``, ``description``, ``priority``.
         """
-        task = self._storage.get_task(task_id)
+        task = await self._storage.get_task(task_id)
         if task is None:
             raise ValueError(f"Task not found: {task_id}")
 
@@ -291,7 +291,7 @@ class TaskManager:
             else:
                 setattr(task, key, str(value)[:self._max_description if key == "description" else self._max_title])
 
-        self._storage.update_task(task)
+        await self._storage.update_task(task)
         logger.info("Task updated: id=%s keys=%s", task_id, list(new_data.keys()))
         return task.to_dict()
 
@@ -299,7 +299,7 @@ class TaskManager:
 
     async def get_stats(self) -> dict[str, int]:
         """Return aggregate task counts."""
-        return self._storage.get_task_counts()
+        return await self._storage.get_task_counts()
 
 
 # ---------------------------------------------------------------------------
