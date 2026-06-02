@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Human-as-MCP Dashboard</title>
+<style>
+  :root {
+    --bg-primary: #0d1117;
+    --bg-card: #161b22;
+    --bg-input: #0d1117;
+    --bg-hover: #30363d;
+    --bg-modal-overlay: rgba(0,0,0,0.6);
+    --border: #30363d;
+    --text-primary: #c9d1d9;
+    --text-secondary: #8b949e;
+    --text-link: #58a6ff;
+    --color-critical: #da3633;
+    --color-high: #d29922;
+    --color-normal-bg: #30363d;
+    --color-low-bg: #161b22;
+    --color-tool: #1f6feb;
+    --color-completed: #238636;
+    --color-rejected: #da3633;
+    --color-cancelled: #d29922;
+    --color-connected: #238636;
+    --color-disconnected: #da3633;
+    --radius: 6px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+    --font-mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg-primary); color: var(--text-primary); padding: 24px; line-height: 1.5; }
+  h1 { font-size: 20px; margin-bottom: 4px; color: var(--text-link); }
+  .subtitle { color: var(--text-secondary); margin-bottom: 24px; font-size: 13px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 2px; margin-bottom: 16px; }
+  .tab { padding: 8px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-family: inherit; }
+  .tab:hover { background: var(--bg-hover); }
+  .tab.active { background: #1c2128; color: var(--text-primary); border-bottom-color: #1c2128; }
+  .tab:focus-visible { outline: 2px solid var(--text-link); outline-offset: -2px; }
+
+  /* Task list */
+  #task-list { display: flex; flex-direction: column; gap: 12px; }
+  .task-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .task-card .header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 500; white-space: nowrap; }
+  .badge.priority-critical { background: var(--color-critical); color: #fff; }
+  .badge.priority-high { background: var(--color-high); color: #000; }
+  .badge.priority-normal { background: var(--color-normal-bg); color: var(--text-primary); }
+  .badge.priority-low { background: var(--color-low-bg); color: var(--text-secondary); border: 1px solid var(--border); }
+  .badge.tool { background: var(--color-tool); color: #fff; }
+  .badge.completed { background: var(--color-completed); color: #fff; }
+  .badge.rejected { background: var(--color-rejected); color: #fff; }
+  .badge.pending { background: var(--color-normal-bg); color: var(--text-primary); }
+  .badge.cancelled { background: var(--color-cancelled); color: #000; }
+  .task-card .title { font-weight: 600; margin-bottom: 4px; font-size: 15px; }
+  .task-card .meta { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+  .task-card .desc { margin: 8px 0; font-size: 14px; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; max-height: 120px; overflow-y: auto; }
+  .task-card .actions { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { padding: 6px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: #21262d; color: var(--text-primary); cursor: pointer; font-size: 13px; font-family: inherit; transition: background 0.15s; }
+  .btn:hover { background: var(--bg-hover); }
+  .btn:focus-visible { outline: 2px solid var(--text-link); outline-offset: 2px; }
+  .btn.complete { background: var(--color-completed); border-color: #2ea043; color: #fff; }
+  .btn.complete:hover { background: #2ea043; }
+  .btn.reject { background: var(--color-rejected); border-color: #f85149; color: #fff; }
+  .btn.reject:hover { background: #f85149; }
+  .btn.confirm-cancel { background: var(--color-cancelled); border-color: #e3b341; color: #000; }
+  .loading, .empty { text-align: center; padding: 40px; color: var(--text-secondary); }
+  .error { color: #f85149; }
+  .connection-status { font-size: 12px; margin-left: 8px; padding: 2px 8px; border-radius: 12px; }
+  .connection-status.connected { background: var(--color-connected); color: #fff; }
+  .connection-status.disconnected { background: var(--color-disconnected); color: #fff; }
+
+  /* History */
+  .history-group { margin-bottom: 24px; }
+  .history-date { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #21262d; }
+  .history-item { padding: 10px 14px; border-left: 2px solid var(--border); margin-bottom: 6px; font-size: 14px; }
+  .history-item .result-summary { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-modal-overlay); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 24px; width: 480px; max-width: 90vw; max-height: 80vh; overflow-y: auto; }
+  .modal h3 { font-size: 16px; margin-bottom: 16px; color: var(--text-primary); }
+  .modal label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; margin-top: 12px; }
+  .modal textarea, .modal select, .modal input { width: 100%; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 8px; font-size: 14px; font-family: inherit; }
+  .modal textarea { font-family: var(--font-mono); resize: vertical; min-height: 80px; }
+  .modal select { appearance: none; cursor: pointer; }
+  .modal .btn-row { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+  .modal .hint { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* Toast (non-alert notifications) */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--color-completed); color: #fff; padding: 12px 20px; border-radius: var(--radius); font-size: 14px; z-index: 200; opacity: 0; transform: translateY(10px); transition: opacity 0.3s, transform 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    body { padding: 12px; }
+    .task-card .header { flex-direction: column; align-items: flex-start; }
+    .modal { width: 95vw; padding: 16px; }
+  }
+
+  @media (prefers-color-scheme: light) {
+    /* Light theme support reserved for future use. */
+  }
+</style>
+</head>
+<body>
+<h1>Human-as-MCP Dashboard <span id="status-badge" class="connection-status disconnected">disconnected</span></h1>
+<p class="subtitle">AI 委派的人类任务看板 — 按优先级排序，完成或拒绝后 AI 自动获取结果</p>
+
+<div class="tabs" role="tablist">
+  <button class="tab active" role="tab" aria-selected="true" data-tab="pending">待处理 (<span id="pending-count">0</span>)</button>
+  <button class="tab" role="tab" aria-selected="false" data-tab="history">历史</button>
+</div>
+
+<div id="task-list"><div class="loading">加载中...</div></div>
+
+<!-- Complete Modal -->
+<div class="modal-overlay" id="complete-modal" role="dialog" aria-modal="true" aria-labelledby="complete-modal-heading">
+  <div class="modal">
+    <h3 id="complete-modal-heading">✓ 完成任务</h3>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;" id="complete-task-title"></div>
+    <label for="complete-result">结果 <span style="color:#f85149">*</span></label>
+    <textarea id="complete-result" rows="3" placeholder="描述执行结果..."></textarea>
+    <label for="complete-evidence">证据（可选，每行一个路径或链接）</label>
+    <textarea id="complete-evidence" rows="2" placeholder="截图路径&#10;日志文件路径&#10;..."></textarea>
+    <div class="btn-row">
+      <button class="btn" data-modal-close="complete-modal">取消</button>
+      <button class="btn complete" id="complete-submit-btn">提交</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal-overlay" id="reject-modal" role="dialog" aria-modal="true" aria-labelledby="reject-modal-heading">
+  <div class="modal">
+    <h3 id="reject-modal-heading">✗ 拒绝任务</h3>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;" id="reject-task-title"></div>
+    <label for="reject-reason">拒绝理由 <span style="color:#f85149">*</span></label>
+    <select id="reject-reason">
+      <option value="">-- 选择理由 --</option>
+      <option value="ai_can_do">AI 可以自己完成 — 这个任务 AI 有能力做</option>
+      <option value="unclear">需求描述不清楚 — 我看不懂要做什么</option>
+      <option value="out_of_scope">超出我的能力/职责范围</option>
+      <option value="invalid_task">任务前提有误，无法执行</option>
+    </select>
+    <label for="reject-note">补充说明（可选）</label>
+    <textarea id="reject-note" rows="2" placeholder="可选：补充说明..."></textarea>
+    <div class="btn-row">
+      <button class="btn" data-modal-close="reject-modal">取消</button>
+      <button class="btn reject" id="reject-submit-btn">提交</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  const API = '/api';
+  let currentTab = 'pending';
+  let ws = null;
+  let currentTaskId = null;
+  let pollTimer = null;
+  let reconnectTimer = null;
+  let reconnectDelay = 3000;
+  const MAX_RECONNECT_DELAY = 60000;
+
+  // ---- Helpers ----
+  function escapeHtml(s) {
+    if (!s) return '';
+    const el = document.createElement('span');
+    el.textContent = s;
+    return el.innerHTML;
+  }
+  function timeAgo(iso) {
+    if (!iso) return '';
+    const ts = new Date(iso).getTime();
+    if (isNaN(ts)) return '';
+    const diff = (Date.now() - ts) / 1000;
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+    if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+    return Math.floor(diff / 86400) + ' 天前';
+  }
+  function deadlineText(minutes) {
+    if (!minutes || minutes <= 0) return '';
+    if (minutes <= 30) return '截止 ' + minutes + ' 分钟后';
+    if (minutes <= 120) return '截止 ' + Math.floor(minutes / 60) + ' 小时后';
+    return '';
+  }
+
+  // ---- WebSocket ----
+  function connectWS() {
+    if (ws && ws.readyState === WebSocket.OPEN) return;
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    // Read token from localStorage for authenticated WebSocket connections.
+    const token = localStorage.getItem('ws_token') || '';
+    const wsUrl = proto + '//' + location.host + '/ws' + (token ? '?token=' + encodeURIComponent(token) : '');
+
+    ws = new WebSocket(wsUrl);
+    ws.onopen = function () {
+      document.getElementById('status-badge').textContent = 'connected';
+      document.getElementById('status-badge').className = 'connection-status connected';
+      reconnectDelay = 3000; // Reset backoff.
+      loadTasks();
+    };
+    ws.onclose = function (evt) {
+      document.getElementById('status-badge').textContent = 'disconnected';
+      document.getElementById('status-badge').className = 'connection-status disconnected';
+      scheduleReconnect();
+    };
+    ws.onmessage = function (e) {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'new_task' || msg.type === 'task_updated') {
+          if (currentTab === 'pending') loadTasks();
+        }
+      } catch (_) { /* ignore malformed messages */ }
+    };
+    ws.onerror = function () { ws.close(); };
+  }
+
+  function scheduleReconnect() {
+    if (reconnectTimer) return;
+    reconnectTimer = setTimeout(function () {
+      reconnectTimer = null;
+      reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+      connectWS();
+    }, reconnectDelay);
+  }
+
+  // ---- Polling (fallback) ----
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(loadTasks, 15000);
+  }
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  // Pause polling when page is hidden, resume when visible.
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      stopPolling();
+    } else {
+      if (currentTab === 'pending') loadTasks();
+      startPolling();
+    }
+  });
+
+  // ---- Modal helpers ----
+  function openModal(id, taskId, title) {
+    currentTaskId = taskId;
+    if (id === 'complete-modal') {
+      document.getElementById('complete-task-title').textContent = title;
+      document.getElementById('complete-result').value = '';
+      document.getElementById('complete-evidence').value = '';
+    }
+    if (id === 'reject-modal') {
+      document.getElementById('reject-task-title').textContent = title;
+      document.getElementById('reject-reason').value = '';
+      document.getElementById('reject-note').value = '';
+    }
+    var overlay = document.getElementById(id);
+    overlay.classList.add('active');
+    // Focus the first form element.
+    var firstInput = overlay.querySelector('textarea, select, input');
+    if (firstInput) firstInput.focus();
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+    currentTaskId = null;
+  }
+
+  // ---- Event delegation for task list ----
+  document.getElementById('task-list').addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+
+    // Complete button
+    if (btn.dataset.complete) {
+      openModal('complete-modal', btn.dataset.complete, btn.dataset.title || '');
+      return;
+    }
+    // Reject button
+    if (btn.dataset.reject) {
+      openModal('reject-modal', btn.dataset.reject, btn.dataset.title || '');
+      return;
+    }
+    // Confirm cancel button
+    if (btn.dataset.confirmCancel) {
+      confirmCancel(btn.dataset.confirmCancel);
+      return;
+    }
+  });
+
+  // ---- Tab switching ----
+  document.querySelector('.tabs').addEventListener('click', function (e) {
+    var tab = e.target.closest('button[data-tab]');
+    if (!tab) return;
+    switchTab(tab.dataset.tab);
+  });
+  document.querySelector('.tabs').addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      var tabs = Array.from(document.querySelectorAll('button[data-tab]'));
+      var idx = tabs.indexOf(document.activeElement);
+      if (e.key === 'ArrowRight') idx = (idx + 1) % tabs.length;
+      else idx = (idx - 1 + tabs.length) % tabs.length;
+      tabs[idx].focus();
+      tabs[idx].click();
+    }
+  });
+
+  // ---- Modal close: ESC key + overlay click + close buttons ----
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      var activeModal = document.querySelector('.modal-overlay.active');
+      if (activeModal) closeModal(activeModal.id);
+    }
+  });
+  document.addEventListener('click', function (e) {
+    // Overlay click
+    if (e.target.classList.contains('modal-overlay') && e.target.classList.contains('active')) {
+      closeModal(e.target.id);
+    }
+    // Close button
+    if (e.target.dataset.modalClose) {
+      closeModal(e.target.dataset.modalClose);
+    }
+  });
+
+  // ---- Task loading ----
+  async function loadTasks() {
+    var list = document.getElementById('task-list');
+    try {
+      var url = currentTab === 'pending'
+        ? API + '/tasks/pending'
+        : API + '/tasks/history?limit=100&offset=0';
+      var resp = await fetch(url);
+
+      if (!resp.ok) {
+        var errText = '服务器错误 (' + resp.status + ')';
+        try { var errBody = await resp.json(); errText = errBody.error || errText; } catch (_) {}
+        list.innerHTML = '<div class="error">加载失败: ' + escapeHtml(errText) + '</div>';
+        return;
+      }
+
+      var tasks = await resp.json();
+
+      if (currentTab === 'pending') {
+        document.getElementById('pending-count').textContent = tasks.length;
+        if (!tasks.length) {
+          list.innerHTML = '<div class="empty">暂无待处理任务</div>';
+          return;
+        }
+        list.innerHTML = tasks.map(renderPendingTask).join('');
+      } else {
+        if (!tasks.length) {
+          list.innerHTML = '<div class="empty">暂无历史记录</div>';
+          return;
+        }
+        list.innerHTML = renderHistory(tasks);
+      }
+    } catch (err) {
+      list.innerHTML = '<div class="error">加载失败: ' + escapeHtml(err.message || '网络错误') + '</div>';
+    }
+  }
+
+  function renderPendingTask(t) {
+    var cancelHtml = '';
+    if (t.cancel_requested) {
+      cancelHtml = '<span class="badge cancelled">AI请求取消</span> ' +
+        '<button class="btn confirm-cancel" style="margin-left:4px;" data-confirm-cancel="' + escapeHtml(t.task_id) + '">确认取消</button>';
+    }
+
+    var actions = '';
+    if (!t.cancel_requested) {
+      actions = '<div class="actions">' +
+        '<button class="btn complete" data-complete="' + escapeHtml(t.task_id) + '" data-title="' + escapeHtml(t.title) + '">✓ 完成</button> ' +
+        '<button class="btn reject" data-reject="' + escapeHtml(t.task_id) + '" data-title="' + escapeHtml(t.title) + '">✗ 拒绝</button>' +
+        '</div>';
+    }
+
+    return '<div class="task-card">' +
+      '<div class="header">' +
+        '<span class="badge priority-' + escapeHtml(t.priority) + '">' + escapeHtml(t.priority) + '</span> ' +
+        '<span class="badge tool">' + escapeHtml(t.tool_name) + '</span> ' +
+        cancelHtml +
+        '<span style="margin-left:auto;font-size:11px;color:var(--text-secondary);">' + escapeHtml(t.agent_id) + ' · ' + timeAgo(t.created_at) + ' · ' + deadlineText(t.deadline_minutes) + '</span>' +
+      '</div>' +
+      '<div class="title">' + escapeHtml(t.title) + '</div>' +
+      '<div class="desc">' + escapeHtml(t.description) + '</div>' +
+      actions +
+    '</div>';
+  }
+
+  function renderHistory(tasks) {
+    var groups = {};
+    tasks.forEach(function (t) {
+      var date = (t.completed_at || t.created_at || '').slice(0, 10) || '未知日期';
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(t);
+    });
+
+    return Object.entries(groups).sort(function (a, b) { return b[0].localeCompare(a[0]); }).map(function (entry) {
+      var date = entry[0];
+      var items = entry[1];
+      return '<div class="history-group">' +
+        '<div class="history-date">' + date + '</div>' +
+        items.map(function (t) {
+          var icon = t.status === 'completed' ? '✓' : '✗';
+          var summary = t.status === 'completed'
+            ? (t.result || '').slice(0, 100)
+            : (t.rejection_reason || '未知') + (t.rejection_note ? ': ' + t.rejection_note.slice(0, 60) : '');
+          var time = (t.completed_at || '').slice(11, 16) || '';
+          return '<div class="history-item">' +
+            '<span class="badge ' + (t.status === 'completed' ? 'completed' : 'rejected') + '">' + icon + '</span> ' +
+            '<span style="margin-left:6px;">' + escapeHtml(t.title) + '</span>' +
+            '<span style="float:right;font-size:12px;color:var(--text-secondary);">' + time + '</span>' +
+            '<div class="result-summary">' + escapeHtml(summary) + '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }).join('');
+  }
+
+  // ---- Actions ----
+  document.getElementById('complete-submit-btn').addEventListener('click', async function () {
+    if (!currentTaskId) return;
+    var result = document.getElementById('complete-result').value.trim();
+    if (!result) { showToast('请填写结果'); return; }
+    var evidenceRaw = document.getElementById('complete-evidence').value.trim();
+    var evidence = evidenceRaw ? evidenceRaw.split('\n').map(function (s) { return s.trim(); }).filter(Boolean) : [];
+
+    try {
+      var resp = await fetch(API + '/tasks/' + currentTaskId + '/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ result: result, evidence: evidence })
+      });
+      if (resp.ok) { closeModal('complete-modal'); loadTasks(); showToast('任务已完成'); }
+      else { var body = await resp.json().catch(function () { return {}; }); showToast('失败: ' + (body.error || '未知错误')); }
+    } catch (err) { showToast('错误: ' + err.message); }
+  });
+
+  document.getElementById('reject-submit-btn').addEventListener('click', async function () {
+    if (!currentTaskId) return;
+    var reason = document.getElementById('reject-reason').value;
+    if (!reason) { showToast('请选择拒绝理由'); return; }
+    var note = document.getElementById('reject-note').value.trim();
+
+    try {
+      var resp = await fetch(API + '/tasks/' + currentTaskId + '/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason, note: note })
+      });
+      if (resp.ok) { closeModal('reject-modal'); loadTasks(); showToast('任务已拒绝'); }
+      else { var body = await resp.json().catch(function () { return {}; }); showToast('失败: ' + (body.error || '未知错误')); }
+    } catch (err) { showToast('错误: ' + err.message); }
+  });
+
+  async function confirmCancel(taskId) {
+    if (!confirm('确认取消此任务？')) return;
+    try {
+      var resp = await fetch(API + '/tasks/' + taskId + '/confirm-cancel', { method: 'POST' });
+      if (resp.ok) { loadTasks(); showToast('任务已取消'); }
+      else { var body = await resp.json().catch(function () { return {}; }); showToast('失败: ' + (body.error || '未知错误')); }
+    } catch (err) { showToast('错误: ' + err.message); }
+  }
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('button[data-tab]').forEach(function (el) {
+      var isActive = el.dataset.tab === tab;
+      el.classList.toggle('active', isActive);
+      el.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    loadTasks();
+  }
+
+  // ---- Toast (non-intrusive notification) ----
+  function showToast(msg) {
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._timeout);
+    el._timeout = setTimeout(function () { el.classList.remove('show'); }, 3000);
+  }
+
+  // ---- Init ----
+  connectWS();
+  startPolling();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+# =============================================================================
+# Human-as-MCP Server Configuration
+# =============================================================================
+# This file configures the Human-as-MCP server, which bridges human operators
+# into the MCP (Model Context Protocol) ecosystem as callable tools.
+
+# -----------------------------------------------------------------------------
+# Server settings
+# Controls how the Human-as-MCP server binds and identifies itself.
+# -----------------------------------------------------------------------------
+server:
+  host: "127.0.0.1"       # Bind address (loopback only for local access)
+  port: 4350               # Listening port for incoming MCP connections
+  name: "Human-as-MCP"     # Server name advertised to MCP clients
+
+# -----------------------------------------------------------------------------
+# Task defaults
+# Default values applied when creating new tasks if not explicitly specified.
+# -----------------------------------------------------------------------------
+task_defaults:
+  default_priority: "normal"        # One of: low, normal, high, critical
+  default_deadline_minutes: 120     # Default SLA window before a task is overdue
+  max_title_length: 200             # Truncate task titles beyond this length
+  max_description_length: 10000     # Truncate task descriptions beyond this length
+
+# -----------------------------------------------------------------------------
+# Rate limits
+# Prevents abuse by capping the number of tasks that can be created.
+# -----------------------------------------------------------------------------
+rate_limits:
+  per_agent_per_hour: 30    # Max tasks a single agent can submit per hour
+  global_per_hour: 100      # Max tasks allowed across all agents per hour
+
+# -----------------------------------------------------------------------------
+# Notification settings
+# Controls toast-style desktop notifications triggered by task events.
+# -----------------------------------------------------------------------------
+notification:
+  toast_enabled: true              # Whether to show desktop toast notifications
+  toast_duration_seconds: 10       # How long each toast stays on screen
+
+# -----------------------------------------------------------------------------
+# Storage settings
+# Persistent storage configuration for task data.
+# -----------------------------------------------------------------------------
+storage:
+  db_path: "data/tasks.db"   # Relative path to the SQLite task database
+
+# -----------------------------------------------------------------------------
+# WebSocket settings
+# Authentication and connection settings for the real-time update channel.
+# -----------------------------------------------------------------------------
+websocket:
+  auth_enabled: false             # Set to true to require token authentication
+  shared_secret: ""               # Shared secret token (empty = allow all when auth_enabled=false)
