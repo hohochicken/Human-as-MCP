@@ -1,1 +1,1 @@
-"""Tests for the Human-as-MCP server."""
+"""Tests for the HumanMCP server."""

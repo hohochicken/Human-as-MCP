@@ -1,4 +1,4 @@
-# Human-as-MCP
+# HumanMCP
 
 将人类操作员桥接到 MCP (Model Context Protocol) 生态系统的服务器。当 AI Agent 遇到能力边界或权限边界时，通过标准化的 MCP 工具接口将任务委托给人类执行。
 
@@ -57,7 +57,7 @@ python server/main.py
 ~/.claude/mcp.json
 ```
 
-**2. 添加 Human-as-MCP 配置：**
+**2. 添加 HumanMCP 配置：**
 
 ```json
 {
@@ -140,7 +140,7 @@ python server/main.py
 
 ```bash
 # Windows: 创建计划任务
-schtasks /create /tn "Human-as-MCP" /tr "python H:\Human\server\main.py" /sc onlogon /rl highest
+schtasks /create /tn "HumanMCP" /tr "python H:\Human\server\main.py" /sc onlogon /rl highest
 
 # 或者直接双击 start.bat（启动后保持在后台运行）
 ```

@@ -1,4 +1,4 @@
-"""MCP tool implementations for Human-as-MCP.
+"""MCP tool implementations for HumanMCP.
 
 Each submodule implements one or more ``human_*`` tools that AI agents call
 when they hit a capability or permission boundary.

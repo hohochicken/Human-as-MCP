@@ -1,5 +1,5 @@
 """
-Human-as-MCP Server — Main Application.
+HumanMCP Server — Main Application.
 
 Bridges human operators into the MCP (Model Context Protocol) ecosystem
 as callable tools.  Provides:
@@ -79,7 +79,7 @@ def load_config() -> dict[str, Any]:
 
 def _default_config() -> dict[str, Any]:
     return {
-        "server": {"host": "127.0.0.1", "port": 4350, "name": "Human-as-MCP"},
+        "server": {"host": "127.0.0.1", "port": 4350, "name": "HumanMCP"},
         "task_defaults": {
             "default_priority": "normal",
             "default_deadline_minutes": 120,
@@ -130,7 +130,7 @@ from server.tools import (
 # FastMCP application
 # ---------------------------------------------------------------------------
 
-mcp = FastMCP("Human-as-MCP")
+mcp = FastMCP("HumanMCP")
 
 # ---------------------------------------------------------------------------
 # Global state (populated by ``init()`` at startup)
@@ -1022,7 +1022,7 @@ def _print_startup_message() -> None:
     cfg_server = _config.get("server", {})
     host = cfg_server.get("host", "127.0.0.1")
     port = cfg_server.get("port", 4350)
-    name = cfg_server.get("name", "Human-as-MCP")
+    name = cfg_server.get("name", "HumanMCP")
 
     banner = [
         "",
@@ -1087,7 +1087,7 @@ def _register_custom_routes() -> None:
 
 
 def create_app() -> FastMCP:
-    """Create and fully configure the Human-as-MCP FastMCP application.
+    """Create and fully configure the HumanMCP FastMCP application.
 
     Returns the FastMCP instance ready to be served via::
 

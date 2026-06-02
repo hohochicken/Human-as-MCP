@@ -1,4 +1,4 @@
-"""Boundary gate — rate limiting for the Human-as-MCP system.
+"""Boundary gate — rate limiting for the HumanMCP system.
 
 Checks per-agent and global hourly task-creation limits before allowing a new
 task through.  Loads limits from H:\\Human\\config\\server_config.yaml.

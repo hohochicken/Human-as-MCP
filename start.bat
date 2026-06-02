@@ -3,7 +3,7 @@ chcp 65001 >nul
 cd /d "%~dp0"
 
 echo ============================================
-echo   Human-as-MCP Server
+echo   HumanMCP Server
 echo ============================================
 echo.
 echo Installing dependencies...

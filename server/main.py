@@ -1,5 +1,5 @@
 """
-Entry point for the Human-as-MCP server.
+Entry point for the HumanMCP server.
 
 Usage:
     python server/main.py
@@ -17,7 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 async def main():
-    """Start the Human-as-MCP server."""
+    """Start the HumanMCP server."""
     from server.app import init, create_app
 
     # Initialise storage, run migrations, verify integrity.
@@ -28,7 +28,7 @@ async def main():
 
     print()
     print("=" * 62)
-    print("  Human-as-MCP Server")
+    print("  HumanMCP Server")
     print("  MCP Endpoint : http://127.0.0.1:4350/mcp")
     print("  Dashboard    : http://127.0.0.1:4350/dashboard")
     print("  Health Check : http://127.0.0.1:4350/health")

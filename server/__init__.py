@@ -1,4 +1,4 @@
-"""Human-as-MCP server package.
+"""HumanMCP server package.
 
 Usage::
 

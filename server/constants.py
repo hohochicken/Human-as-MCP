@@ -1,5 +1,5 @@
 """
-Shared constants for the Human-as-MCP server.
+Shared constants for the HumanMCP server.
 
 Centralises magic numbers that were previously repeated across
 app.py and the tools/ modules.
@@ -40,7 +40,7 @@ DEFAULT_DEADLINE_MINUTES = 120
 # ---------------------------------------------------------------------------
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 4350
-DEFAULT_SERVER_NAME = "Human-as-MCP"
+DEFAULT_SERVER_NAME = "HumanMCP"
 
 # ---------------------------------------------------------------------------
 # Notification

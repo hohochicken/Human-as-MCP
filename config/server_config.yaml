@@ -1,17 +1,17 @@
 # =============================================================================
-# Human-as-MCP Server Configuration
+# HumanMCP Server Configuration
 # =============================================================================
-# This file configures the Human-as-MCP server, which bridges human operators
+# This file configures the HumanMCP server, which bridges human operators
 # into the MCP (Model Context Protocol) ecosystem as callable tools.
 
 # -----------------------------------------------------------------------------
 # Server settings
-# Controls how the Human-as-MCP server binds and identifies itself.
+# Controls how the HumanMCP server binds and identifies itself.
 # -----------------------------------------------------------------------------
 server:
   host: "127.0.0.1"       # Bind address (loopback only for local access)
   port: 4350               # Listening port for incoming MCP connections
-  name: "Human-as-MCP"     # Server name advertised to MCP clients
+  name: "HumanMCP"     # Server name advertised to MCP clients
 
 # -----------------------------------------------------------------------------
 # Task defaults
