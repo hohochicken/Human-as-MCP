@@ -291,6 +291,107 @@ class Storage:
         rows = await loop.run_in_executor(None, _get)
         return [self._row_to_task(r) for r in rows]
 
+    async def get_tasks_completed_since(
+        self, since: str, agent_id: str | None = None
+    ) -> list[Task]:
+        """Return tasks completed/rejected after *since* (ISO-8601 timestamp).
+
+        Optionally filter by *agent_id*.  Used by the piggyback mechanism to
+        surface recently-resolved tasks in tool responses.
+        """
+        loop = self._get_loop()
+
+        def _get() -> list[sqlite3.Row]:
+            conn = self._connect()
+            try:
+                if agent_id:
+                    return conn.execute(
+                        """
+                        SELECT * FROM tasks
+                        WHERE status IN ('completed', 'rejected')
+                          AND completed_at > ?
+                          AND agent_id = ?
+                        ORDER BY completed_at DESC
+                        """,
+                        (since, agent_id),
+                    ).fetchall()
+                else:
+                    return conn.execute(
+                        """
+                        SELECT * FROM tasks
+                        WHERE status IN ('completed', 'rejected')
+                          AND completed_at > ?
+                        ORDER BY completed_at DESC
+                        """,
+                        (since,),
+                    ).fetchall()
+            finally:
+                conn.close()
+
+        rows = await loop.run_in_executor(None, _get)
+        return [self._row_to_task(r) for r in rows]
+
+    async def list_tasks(
+        self,
+        status: str | None = "pending",
+        agent_id: str | None = None,
+        limit: int = 50,
+        since: str | None = None,
+    ) -> list[Task]:
+        """Return tasks with flexible filtering, newest-first.
+
+        Parameters
+        ----------
+        status : str or None
+            ``"pending"``, ``"completed"``, ``"rejected"``, ``"all"`` (any
+            non-terminated), or ``None`` for all statuses.
+        agent_id : str or None
+            Filter by agent; ``None`` returns tasks from all agents.
+        limit : int
+            Maximum number of tasks to return.
+        since : str or None
+            ISO-8601 timestamp — only return tasks whose ``created_at`` is
+            after this value.
+        """
+        loop = self._get_loop()
+
+        def _get() -> list[sqlite3.Row]:
+            conn = self._connect()
+            try:
+                conditions: list[str] = []
+                params: list = []
+
+                if status and status != "all":
+                    conditions.append("status = ?")
+                    params.append(status)
+
+                if agent_id:
+                    conditions.append("agent_id = ?")
+                    params.append(agent_id)
+
+                if since:
+                    conditions.append("created_at > ?")
+                    params.append(since)
+
+                where = ""
+                if conditions:
+                    where = "WHERE " + " AND ".join(conditions)
+
+                # Safe: conditions are built from hard-coded column names; only
+                # values come from parameters and are passed via placeholders.
+                sql = (
+                    f"SELECT * FROM tasks {where} "
+                    f"ORDER BY created_at DESC LIMIT ?"
+                )
+                params.append(limit)
+
+                return conn.execute(sql, params).fetchall()
+            finally:
+                conn.close()
+
+        rows = await loop.run_in_executor(None, _get)
+        return [self._row_to_task(r) for r in rows]
+
     async def update_task(self, task: Task) -> None:
         """Update all fields of an existing task."""
         loop = self._get_loop()

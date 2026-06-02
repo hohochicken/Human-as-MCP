@@ -18,6 +18,7 @@ import asyncio
 import json
 import logging
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -140,6 +141,15 @@ storage: Optional[Storage] = None
 task_manager: Optional[TaskManager] = None
 ws_clients: set = set()  # Connected WebSocket clients
 
+# Per-agent "last seen" timestamps for piggyback injection.
+# When any tool is called by agent X, we check for tasks completed since
+# X's last_seen and surface them in the response.
+_agent_last_seen: dict[str, str] = {}
+
+# Active MCP client SSE sessions for push notifications.
+# Each entry is an (event_queue) that accepts server→client notification dicts.
+_mcp_sessions: list[asyncio.Queue] = []
+
 # ---------------------------------------------------------------------------
 # WebSocket broadcast
 # ---------------------------------------------------------------------------
@@ -162,6 +172,113 @@ async def broadcast(message: dict) -> None:
     for ws in stale:
         ws_clients.discard(ws)
         logger.debug("Removed stale WebSocket client.")
+
+
+# ---------------------------------------------------------------------------
+# Piggyback injection — surfaces recently-resolved tasks in every tool response
+# ---------------------------------------------------------------------------
+
+
+async def _inject_piggyback(result: dict, agent_id: str) -> dict:
+    """Check for tasks resolved since this agent's last activity.
+
+    Appends ``pending_results`` and ``recently_completed_task_ids`` to
+    *result* so the AI knows there are new results to fetch **without**
+    needing an explicit poll.
+
+    Also updates the agent's ``last_seen`` timestamp.
+    """
+    if task_manager is None:
+        return result
+
+    now = datetime.now(timezone.utc).isoformat()
+    since = _agent_last_seen.get(agent_id)
+
+    # Update last-seen *before* the query so we don't miss anything that
+    # arrives between the query and the next call.
+    _agent_last_seen[agent_id] = now
+
+    if not since:
+        return result
+
+    try:
+        recent = await task_manager.get_recently_completed(
+            since=since, agent_id=agent_id,
+        )
+    except Exception:
+        logger.debug("Piggyback query failed", exc_info=True)
+        return result
+
+    if recent:
+        result["pending_results"] = True
+        result["recently_completed_task_ids"] = [
+            {
+                "task_id": t["task_id"],
+                "title": t["title"],
+                "status": t["status"],
+                "completed_at": t.get("completed_at"),
+            }
+            for t in recent
+        ]
+        logger.debug(
+            "Piggyback: agent=%s has %d resolved task(s) since %s",
+            agent_id, len(recent), since,
+        )
+    else:
+        result["pending_results"] = False
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# MCP session push — pushes task-status notifications to active MCP clients
+# ---------------------------------------------------------------------------
+
+
+def register_mcp_session() -> asyncio.Queue:
+    """Create and register a new MCP client session queue.
+
+    Returns an async queue that callers should consume from.
+    Call ``unregister_mcp_session(q)`` when the session ends.
+    """
+    q: asyncio.Queue = asyncio.Queue()
+    _mcp_sessions.append(q)
+    logger.debug("MCP session registered (%d active).", len(_mcp_sessions))
+    return q
+
+
+def unregister_mcp_session(q: asyncio.Queue) -> None:
+    """Remove a previously registered MCP session queue."""
+    _mcp_sessions[:] = [s for s in _mcp_sessions if s is not q]
+    logger.debug("MCP session unregistered (%d remaining).", len(_mcp_sessions))
+
+
+async def push_to_mcp_sessions(notification: dict) -> None:
+    """Push a notification to all active MCP client sessions.
+
+    Sessions that are full (consumers too slow) are silently dropped.
+    """
+    if not _mcp_sessions:
+        return
+
+    stale: list[asyncio.Queue] = []
+    for q in _mcp_sessions:
+        try:
+            q.put_nowait(notification)
+        except asyncio.QueueFull:
+            stale.append(q)
+        except Exception:
+            stale.append(q)
+
+    for q in stale:
+        unregister_mcp_session(q)
+
+    if notification.get("type") == "task_completed":
+        logger.info(
+            "Pushed task_completed notification to %d MCP session(s): task_id=%s",
+            len(_mcp_sessions) - len(stale),
+            notification.get("task_id"),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -203,6 +320,19 @@ def _tool_context() -> dict:
         "broadcast": broadcast,
         "agent_id": _get_agent_id(),
     }
+
+
+async def _with_piggyback(coro) -> dict:
+    """Await *coro* and inject piggyback data into the returned dict.
+
+    Every ``@mcp.tool()`` wrapper routes through this so AI agents always
+    receive ``pending_results`` and ``recently_completed_task_ids`` (when
+    applicable) without needing an explicit poll.
+    """
+    result = await coro
+    if isinstance(result, dict):
+        return await _inject_piggyback(result, _get_agent_id())
+    return result
 
 
 @mcp.tool()
@@ -253,7 +383,7 @@ async def human_action(
     同步响应(sync=true): {"task_id":"...", "status":"completed"|"rejected", "result":"...", ...}
     超时回退(sync=false): {"task_id":"...", "status":"pending", "message":"Poll with human_poll(...)"}
     """
-    return await _human_action_impl(
+    return await _with_piggyback(_human_action_impl(
         title=title,
         description=description,
         steps=steps,
@@ -262,7 +392,7 @@ async def human_action(
         priority=priority,
         deadline_minutes=deadline_minutes,
         **_tool_context(),
-    )
+    ))
 
 
 @mcp.tool()
@@ -306,7 +436,7 @@ async def human_decision(
 
     **返回**: 同 human_action 的返回结构
     """
-    return await _human_decision_impl(
+    return await _with_piggyback(_human_decision_impl(
         title=title,
         context=context,
         options=options,
@@ -316,7 +446,7 @@ async def human_decision(
         priority=priority,
         deadline_minutes=deadline_minutes,
         **_tool_context(),
-    )
+    ))
 
 
 @mcp.tool()
@@ -358,7 +488,7 @@ async def human_information(
 
     **返回**: 同 human_action 的返回结构
     """
-    return await _human_information_impl(
+    return await _with_piggyback(_human_information_impl(
         question=question,
         context=context,
         domain=domain,
@@ -367,7 +497,7 @@ async def human_information(
         priority=priority,
         deadline_minutes=deadline_minutes,
         **_tool_context(),
-    )
+    ))
 
 
 @mcp.tool()
@@ -390,7 +520,7 @@ async def human_poll(task_id: str | list[str]) -> dict:
     单个: {"task_id":"...", "status":"pending"|"completed"|"rejected", "result":"...", ...}
     批量: {"tasks":[...], "summary":{"pending":N, "completed":N, "rejected":N, "not_found":N}}
     """
-    return await _human_poll_impl(task_id=task_id, task_manager=task_manager)
+    return await _with_piggyback(_human_poll_impl(task_id=task_id, task_manager=task_manager))
 
 
 @mcp.tool()
@@ -416,14 +546,14 @@ async def human_cancel(
     **返回**
     {"status":"cancelled"|"modified", "task_id":"...", "message":"..."}
     """
-    return await _human_cancel_impl(
+    return await _with_piggyback(_human_cancel_impl(
         task_id=task_id,
         reason=reason,
         action=action,
         new_data=new_data,
         task_manager=task_manager,
         broadcast=broadcast,
-    )
+    ))
 
 
 @mcp.tool()
@@ -431,8 +561,9 @@ async def human_list_tasks(
     status: str = "pending",
     agent_id: Optional[str] = None,
     limit: int = 50,
+    since: Optional[str] = None,
 ) -> dict:
-    """List tasks by status, optionally filtered by agent.
+    """List tasks by status, optionally filtered by agent and time.
 
     **用途**
     - 恢复上下文：新会话开始时，查看之前派了哪些任务
@@ -443,21 +574,24 @@ async def human_list_tasks(
     - 启动时先调这个看有没有未完成的 pending 任务
     - 如果积压 >5 个，优先推进不依赖人类的工作
     - 结合 human_poll 获取已完成任务的结果
+    - 传递 since 参数仅获取增量变化（ISO-8601 时间戳）
 
     **参数**
     status: "pending"(默认)|"completed"|"rejected"|"all"
     agent_id: 筛选特定 agent（默认不过滤）
     limit: 最大返回数（默认 50）
+    since: ISO-8601 时间戳，只返回此时间之后创建或完成的任务
 
     **返回**
     {"tasks": [{"task_id":"...", "title":"...", "status":"...", ...}], "total": N}
     """
-    return await _human_list_tasks_impl(
+    return await _with_piggyback(_human_list_tasks_impl(
         status=status,
         agent_id=agent_id,
         limit=limit,
+        since=since,
         task_manager=task_manager,
-    )
+    ))
 
 
 # ===========================================================================
@@ -618,6 +752,16 @@ async def handle_api_task_complete(request: Any) -> Any:
         "task_id": task_id,
         "status": "completed",
     })
+
+    # Push to active MCP client sessions so AI gets notified immediately.
+    await push_to_mcp_sessions({
+        "type": "task_completed",
+        "task_id": task_id,
+        "status": "completed",
+        "title": task.get("title", ""),
+        "completed_at": task.get("completed_at"),
+    })
+
     return _json_response(task)
 
 
@@ -652,6 +796,16 @@ async def handle_api_task_reject(request: Any) -> Any:
         "task_id": task_id,
         "status": "rejected",
     })
+
+    await push_to_mcp_sessions({
+        "type": "task_completed",
+        "task_id": task_id,
+        "status": "rejected",
+        "title": task.get("title", ""),
+        "rejection_reason": task.get("rejection_reason"),
+        "completed_at": task.get("completed_at"),
+    })
+
     return _json_response(task)
 
 

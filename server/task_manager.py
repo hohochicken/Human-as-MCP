@@ -133,6 +133,46 @@ class TaskManager:
         tasks = self._storage.get_history_tasks(limit=limit, offset=offset)
         return [t.to_dict() for t in tasks]
 
+    async def list_tasks(
+        self,
+        status: str | None = "pending",
+        agent_id: str | None = None,
+        limit: int = 50,
+        since: str | None = None,
+    ) -> list[dict]:
+        """Return tasks with flexible filtering, newest-first.
+
+        Parameters
+        ----------
+        status : str or None
+            Filter by status; ``"all"`` returns all statuses.  Default ``"pending"``.
+        agent_id : str or None
+            Filter by agent; ``None`` = all agents.
+        limit : int
+            Max results (default 50).
+        since : str or None
+            ISO-8601 timestamp; only tasks with ``created_at > since``
+            or ``completed_at > since`` are returned.
+        """
+        tasks = self._storage.list_tasks(
+            status=status,
+            agent_id=agent_id,
+            limit=limit,
+            since=since,
+        )
+        return [t.to_dict() for t in tasks]
+
+    async def get_recently_completed(
+        self,
+        since: str,
+        agent_id: str | None = None,
+    ) -> list[dict]:
+        """Return tasks completed/rejected after *since*, for piggyback injection."""
+        tasks = self._storage.get_tasks_completed_since(
+            since=since, agent_id=agent_id,
+        )
+        return [t.to_dict() for t in tasks]
+
     # -- Update / lifecycle --------------------------------------------------
 
     async def complete_task(

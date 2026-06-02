@@ -127,14 +127,16 @@ async def human_list_tasks(
     status: str = "pending",
     agent_id: Optional[str] = None,
     limit: int = 50,
+    since: Optional[str] = None,
     task_manager: Any = None,
 ) -> dict:
-    """List tasks by status and optionally filter by agent.
+    """List tasks by status, optionally filtered by agent and time.
 
     Parameters:
     - status: One of "pending", "completed", "rejected", "all". Default "pending".
     - agent_id: Optional agent ID to filter by. None = all agents.
     - limit: Maximum number of results. Default 50.
+    - since: ISO-8601 timestamp. Only return tasks created or completed after this time.
     - task_manager: Injected by the server.
 
     Returns:
@@ -152,7 +154,9 @@ async def human_list_tasks(
         }
 
     try:
-        tasks = await task_manager.list_tasks(status=status, agent_id=agent_id, limit=limit)
+        tasks = await task_manager.list_tasks(
+            status=status, agent_id=agent_id, limit=limit, since=since,
+        )
     except Exception as e:
         return {"status": "error", "message": f"Failed to list tasks: {e}"}
 

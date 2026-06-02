@@ -2,11 +2,13 @@
 
 Tests the simplified tool set by injecting mock task_manager and storage,
 verifying that each tool handles its parameters correctly and produces the
-expected output shapes.
+expected output shapes.  Includes tests for the ``since`` parameter on
+``human_list_tasks``.
 """
 
 import pytest
 from unittest.mock import MagicMock, AsyncMock, call
+from datetime import datetime, timezone
 
 
 # ---------------------------------------------------------------------------
@@ -269,7 +271,7 @@ class TestHumanListTasks:
         assert result["total"] == 2
         assert result["status_filter"] == "pending"
         mock_task_manager.list_tasks.assert_called_once_with(
-            status="pending", agent_id=None, limit=50,
+            status="pending", agent_id=None, limit=50, since=None,
         )
 
     @pytest.mark.asyncio
@@ -285,7 +287,7 @@ class TestHumanListTasks:
 
         assert result["total"] == 1
         mock_task_manager.list_tasks.assert_called_once_with(
-            status="pending", agent_id="agent-42", limit=50,
+            status="pending", agent_id="agent-42", limit=50, since=None,
         )
 
     @pytest.mark.asyncio
@@ -302,5 +304,33 @@ class TestHumanListTasks:
         assert result["total"] == 3
         assert result["status_filter"] == "all"
         mock_task_manager.list_tasks.assert_called_once_with(
-            status="all", agent_id=None, limit=50,
+            status="all", agent_id=None, limit=50, since=None,
         )
+
+    @pytest.mark.asyncio
+    async def test_human_list_tasks_with_since(self, mock_task_manager):
+        """Pass a since timestamp; tool forwards it to task_manager."""
+        now = datetime.now(timezone.utc).isoformat()
+        mock_task_manager.list_tasks.return_value = [
+            {"task_id": "t-new", "title": "New since T", "status": "completed"},
+        ]
+
+        result = await human_list_tasks(
+            status="completed",
+            since=now,
+            task_manager=mock_task_manager,
+        )
+
+        assert result["total"] == 1
+        mock_task_manager.list_tasks.assert_called_once_with(
+            status="completed", agent_id=None, limit=50, since=now,
+        )
+
+    @pytest.mark.asyncio
+    async def test_human_list_tasks_with_invalid_status(self, mock_task_manager):
+        """Reject an invalid status value."""
+        result = await human_list_tasks(
+            status="unknown", task_manager=mock_task_manager,
+        )
+        assert result["status"] == "error"
+        mock_task_manager.list_tasks.assert_not_called()
