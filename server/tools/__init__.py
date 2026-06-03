@@ -17,7 +17,7 @@ Modules:
 from server.tools.action import human_action
 from server.tools.decision import human_decision
 from server.tools.information import human_information
-from server.tools.infrastructure import human_poll, human_cancel, human_list_tasks
+from server.tools.infrastructure import human_poll, human_cancel, human_list_tasks, human_wait
 
 __all__ = [
     "human_action",
@@ -26,4 +26,5 @@ __all__ = [
     "human_poll",
     "human_cancel",
     "human_list_tasks",
+    "human_wait",
 ]

@@ -124,6 +124,7 @@ from server.tools import (
     human_poll as _human_poll_impl,
     human_cancel as _human_cancel_impl,
     human_list_tasks as _human_list_tasks_impl,
+    human_wait as _human_wait_impl,
 )
 
 # ---------------------------------------------------------------------------
@@ -611,6 +612,49 @@ async def human_list_tasks(
     ))
 
 
+@mcp.tool()
+async def human_wait(
+    task_id: str,
+    timeout: int = 300,
+) -> dict:
+    """Wait for a human to complete or reject a pending task.
+
+    **用途** — 人类已离线，但你想第一时间拿到结果时使用
+    派发 human_action/human_decision/human_information 后，如果返回
+    sync=false（人类不在 180s 窗口内响应），调用 human_wait 阻塞等待。
+
+    **工作方式**
+    在服务端注册一个通知监听器，人类通过 Dashboard 完成任务时，服务端
+    立即推送通知，human_wait 收到后返回完整结果。这是一个实时推送机制，
+    不需要 Agent 反复轮询 human_poll。
+
+    **参数**
+    task_id: 要等待的任务 ID（必填）
+    timeout: 最长等待秒数（默认 300s，最大 600s）
+
+    **返回**
+    {
+      "task_id": "...", "status": "completed"|"rejected"|"pending",
+      "wait_status": "notified"|"timeout"|"already_resolved",
+      "result": "...",  // if completed
+      "rejection_reason": "...",  // if rejected
+      ...
+    }
+
+    wait_status 含义：
+    - "notified" — 人类已响应，以下为完整结果
+    - "timeout"  — 等待超时，人类尚未响应。可用 human_poll 继续轮询
+    - "already_resolved" — 调用时任务已处于终态（可能中间已经完成了）
+    """
+    return await _human_wait_impl(
+        task_id=task_id,
+        timeout=timeout,
+        task_manager=task_manager,
+        register_session=register_mcp_session,
+        unregister_session=unregister_mcp_session,
+    )
+
+
 # ===========================================================================
 # HTTP route handlers (Dashboard + REST API)
 # ===========================================================================
@@ -768,6 +812,7 @@ async def handle_api_task_complete(request: Any) -> Any:
         "type": "task_updated",
         "task_id": task_id,
         "status": "completed",
+        "task": task,
     })
 
     # Push to active MCP client sessions so AI gets notified immediately.
@@ -813,6 +858,7 @@ async def handle_api_task_reject(request: Any) -> Any:
         "type": "task_updated",
         "task_id": task_id,
         "status": "rejected",
+        "task": task,
     })
 
     await push_to_mcp_sessions({
@@ -851,6 +897,54 @@ async def handle_api_task_confirm_cancel(request: Any) -> Any:
         "status": "cancelled",
     })
     return _json_response(task)
+
+
+# --- API: session messages ------------------------------------------------
+
+
+async def handle_api_session_messages(request: Any) -> Any:
+    """GET /api/session/messages?limit=50 — 返回 HumanMCP 会话日志。"""
+    try:
+        limit = int(request.query_params.get("limit", 50))
+    except ValueError:
+        limit = 50
+
+    log_path = PROJECT_ROOT / "data" / "session_log.jsonl"
+    if not log_path.exists():
+        return _json_response({"messages": [], "total": 0})
+
+    try:
+        with open(log_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception:
+        return _json_response({"error": "Failed to read session log"}, status_code=500)
+
+    messages = []
+    for line in lines[-limit:]:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        messages.append(msg)
+
+    return _json_response({
+        "messages": messages,
+        "total": len(messages),
+    })
+
+
+async def handle_api_session_clear(request: Any) -> Any:
+    """DELETE /api/session/messages — 清空会话日志。"""
+    log_path = PROJECT_ROOT / "data" / "session_log.jsonl"
+    try:
+        if log_path.exists():
+            log_path.unlink()
+        return _json_response({"status": "cleared"})
+    except Exception:
+        return _json_response({"error": "Failed to clear session log"}, status_code=500)
 
 
 # --- API: stats ----------------------------------------------------------
@@ -916,6 +1010,8 @@ async def handle_ws(websocket: Any) -> None:
     Clients receive JSON messages like:
       - ``{"type": "new_task", "task": {...}}``
       - ``{"type": "task_updated", "task_id": "...", "status": "..."}``
+
+    Also forwards ``user_chat`` messages from Dashboard → other clients (Gateway Plugin).
     """
     if not _verify_ws_token(websocket):
         await websocket.close(code=4001, reason="Unauthorized")
@@ -928,8 +1024,14 @@ async def handle_ws(websocket: Any) -> None:
         while True:
             data = await websocket.receive_text()
             logger.debug("WS message received: %s", data[:200])
+            # Forward user_chat messages to all clients (Dashboard → Gateway Plugin)
+            try:
+                msg = json.loads(data)
+                if msg.get("type") == "user_chat":
+                    await broadcast(msg)
+            except (json.JSONDecodeError, Exception):
+                pass
     except Exception:
-        # WebSocketDisconnect or any other error — client goes away.
         pass
     finally:
         ws_clients.discard(websocket)
@@ -971,6 +1073,10 @@ def _build_routes() -> list:
         # Stats
         Route("/api/stats", handle_api_stats, methods=["GET"]),
         Route("/api/stats", _cors_preflight, methods=["OPTIONS"]),
+        # Session messages
+        Route("/api/session/messages", handle_api_session_messages, methods=["GET"]),
+        Route("/api/session/messages", handle_api_session_clear, methods=["DELETE"]),
+        Route("/api/session/messages", _cors_preflight, methods=["OPTIONS"]),
         # WebSocket
         WebSocketRoute("/ws", handle_ws),
     ]

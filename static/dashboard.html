@@ -1,154 +1,545 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HumanMCP Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg-primary: #0d1117;
-    --bg-card: #161b22;
-    --bg-input: #0d1117;
-    --bg-hover: #30363d;
-    --bg-modal-overlay: rgba(0,0,0,0.6);
-    --border: #30363d;
-    --text-primary: #c9d1d9;
-    --text-secondary: #8b949e;
-    --text-link: #58a6ff;
-    --color-critical: #da3633;
-    --color-high: #d29922;
-    --color-normal-bg: #30363d;
-    --color-low-bg: #161b22;
-    --color-tool: #1f6feb;
-    --color-completed: #238636;
-    --color-rejected: #da3633;
-    --color-cancelled: #d29922;
-    --color-connected: #238636;
-    --color-disconnected: #da3633;
-    --radius: 6px;
-    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
-    --font-mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-  }
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: var(--font); background: var(--bg-primary); color: var(--text-primary); padding: 24px; line-height: 1.5; }
-  h1 { font-size: 20px; margin-bottom: 4px; color: var(--text-link); }
-  .subtitle { color: var(--text-secondary); margin-bottom: 24px; font-size: 13px; }
+/* ═══════════════════════════════════════════════
+   HumanMCP Dashboard — Design System
+   Inspired by Linear's precision engineering aesthetic
+   ═══════════════════════════════════════════════ */
 
-  /* Tabs */
-  .tabs { display: flex; gap: 2px; margin-bottom: 16px; }
-  .tab { padding: 8px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-family: inherit; }
-  .tab:hover { background: var(--bg-hover); }
-  .tab.active { background: #1c2128; color: var(--text-primary); border-bottom-color: #1c2128; }
-  .tab:focus-visible { outline: 2px solid var(--text-link); outline-offset: -2px; }
+:root {
+  /* ── Dark Mode (default) ── */
+  --bg-root: #08090a;
+  --bg-surface: #0f1011;
+  --bg-elevated: #191a1b;
+  --bg-hover: rgba(255,255,255,0.04);
+  --bg-active: rgba(255,255,255,0.06);
+  --bg-input: rgba(255,255,255,0.02);
+  --bg-card: rgba(255,255,255,0.02);
+  --bg-card-hover: rgba(255,255,255,0.04);
+  --bg-modal-overlay: rgba(0,0,0,0.7);
+  --bg-badge: rgba(255,255,255,0.06);
 
-  /* Task list */
-  #task-list { display: flex; flex-direction: column; gap: 12px; }
-  .task-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
-  .task-card .header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-  .badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 500; white-space: nowrap; }
-  .badge.priority-critical { background: var(--color-critical); color: #fff; }
-  .badge.priority-high { background: var(--color-high); color: #000; }
-  .badge.priority-normal { background: var(--color-normal-bg); color: var(--text-primary); }
-  .badge.priority-low { background: var(--color-low-bg); color: var(--text-secondary); border: 1px solid var(--border); }
-  .badge.tool { background: var(--color-tool); color: #fff; }
-  .badge.completed { background: var(--color-completed); color: #fff; }
-  .badge.rejected { background: var(--color-rejected); color: #fff; }
-  .badge.pending { background: var(--color-normal-bg); color: var(--text-primary); }
-  .badge.cancelled { background: var(--color-cancelled); color: #000; }
-  .task-card .title { font-weight: 600; margin-bottom: 4px; font-size: 15px; }
-  .task-card .meta { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
-  .task-card .desc { margin: 8px 0; font-size: 14px; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; max-height: 120px; overflow-y: auto; }
-  .task-card .actions { display: flex; gap: 8px; margin-top: 12px; }
-  .btn { padding: 6px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: #21262d; color: var(--text-primary); cursor: pointer; font-size: 13px; font-family: inherit; transition: background 0.15s; }
-  .btn:hover { background: var(--bg-hover); }
-  .btn:focus-visible { outline: 2px solid var(--text-link); outline-offset: 2px; }
-  .btn.complete { background: var(--color-completed); border-color: #2ea043; color: #fff; }
-  .btn.complete:hover { background: #2ea043; }
-  .btn.reject { background: var(--color-rejected); border-color: #f85149; color: #fff; }
-  .btn.reject:hover { background: #f85149; }
-  .btn.confirm-cancel { background: var(--color-cancelled); border-color: #e3b341; color: #000; }
-  .loading, .empty { text-align: center; padding: 40px; color: var(--text-secondary); }
-  .error { color: #f85149; }
-  .connection-status { font-size: 12px; margin-left: 8px; padding: 2px 8px; border-radius: 12px; }
-  .connection-status.connected { background: var(--color-connected); color: #fff; }
-  .connection-status.disconnected { background: var(--color-disconnected); color: #fff; }
+  --text-primary: #f7f8f8;
+  --text-secondary: #d0d6e0;
+  --text-tertiary: #8a8f98;
+  --text-muted: #62666d;
+  --text-link: #828fff;
 
-  /* History */
-  .history-group { margin-bottom: 24px; }
-  .history-date { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #21262d; }
-  .history-item { padding: 10px 14px; border-left: 2px solid var(--border); margin-bottom: 6px; font-size: 14px; }
-  .history-item .result-summary { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+  --accent: #5e6ad2;
+  --accent-hover: #7170ff;
+  --accent-light: #828fff;
+  --accent-bg: rgba(94,106,210,0.12);
+  --accent-border: rgba(94,106,210,0.3);
 
-  /* Modal */
-  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-modal-overlay); z-index: 100; align-items: center; justify-content: center; }
-  .modal-overlay.active { display: flex; }
-  .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 24px; width: 480px; max-width: 90vw; max-height: 80vh; overflow-y: auto; }
-  .modal h3 { font-size: 16px; margin-bottom: 16px; color: var(--text-primary); }
-  .modal label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; margin-top: 12px; }
-  .modal textarea, .modal select, .modal input { width: 100%; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 8px; font-size: 14px; font-family: inherit; }
-  .modal textarea { font-family: var(--font-mono); resize: vertical; min-height: 80px; }
-  .modal select { appearance: none; cursor: pointer; }
-  .modal .btn-row { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
-  .modal .hint { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  --success: #10b981;
+  --success-bg: rgba(16,185,129,0.12);
+  --danger: #ef4444;
+  --danger-bg: rgba(239,68,68,0.12);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245,158,11,0.12);
+  --info: #3b82f6;
+  --info-bg: rgba(59,130,246,0.12);
 
-  /* Toast (non-alert notifications) */
-  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--color-completed); color: #fff; padding: 12px 20px; border-radius: var(--radius); font-size: 14px; z-index: 200; opacity: 0; transform: translateY(10px); transition: opacity 0.3s, transform 0.3s; pointer-events: none; }
-  .toast.show { opacity: 1; transform: translateY(0); }
+  --border: rgba(255,255,255,0.08);
+  --border-subtle: rgba(255,255,255,0.05);
+  --border-input: rgba(255,255,255,0.1);
 
-  /* Responsive */
-  @media (max-width: 640px) {
-    body { padding: 12px; }
-    .task-card .header { flex-direction: column; align-items: flex-start; }
-    .modal { width: 95vw; padding: 16px; }
-  }
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
 
-  @media (prefers-color-scheme: light) {
-    /* Light theme support reserved for future use. */
-  }
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow: 0 2px 8px rgba(0,0,0,0.4);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,0.5);
+
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, 'Consolas', monospace;
+
+  --transition: 150ms ease;
+  --transition-theme: 300ms ease;
+}
+
+/* ── Light Mode ── */
+[data-theme="light"] {
+  --bg-root: #f7f8f8;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f3f4f5;
+  --bg-hover: rgba(0,0,0,0.04);
+  --bg-active: rgba(0,0,0,0.06);
+  --bg-input: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f9fafb;
+  --bg-modal-overlay: rgba(0,0,0,0.4);
+  --bg-badge: rgba(0,0,0,0.05);
+
+  --text-primary: #171717;
+  --text-secondary: #3d3d3d;
+  --text-tertiary: #6b6b6b;
+  --text-muted: #9a9a9a;
+  --text-link: #5e6ad2;
+
+  --accent: #5e6ad2;
+  --accent-hover: #4f5bc0;
+  --accent-light: #7170ff;
+
+  --border: rgba(0,0,0,0.08);
+  --border-subtle: rgba(0,0,0,0.05);
+  --border-input: rgba(0,0,0,0.12);
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,0.1);
+}
+
+/* ═══════════════════════════════════════════════
+   Reset & Base
+   ═══════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg-root);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  transition: background var(--transition-theme), color var(--transition-theme);
+}
+
+/* ═══════════════════════════════════════════════
+   Header
+   ═══════════════════════════════════════════════ */
+.header {
+  position: sticky; top: 0; z-index: 50;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 24px;
+  transition: background var(--transition-theme), border-color var(--transition-theme);
+}
+.header-inner {
+  max-width: 1440px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 52px;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-logo {
+  font-size: 15px; font-weight: 600; color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+.header-logo span { color: var(--accent); }
+.header-right { display: flex; align-items: center; gap: 12px; }
+
+/* Theme Toggle */
+.theme-toggle {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-tertiary); font-size: 13px; font-family: var(--font);
+  padding: 4px 10px; border-radius: var(--radius);
+  transition: all var(--transition);
+}
+.theme-toggle:hover { color: var(--text-primary); background: var(--bg-hover); }
+.theme-toggle svg { width: 16px; height: 16px; }
+
+/* Status Badge */
+.status-badge {
+  font-size: 11px; font-weight: 500; padding: 3px 10px;
+  border-radius: var(--radius-full); letter-spacing: 0.3px;
+  transition: all var(--transition);
+}
+.status-badge.connected { background: var(--success-bg); color: var(--success); }
+.status-badge.disconnected { background: var(--danger-bg); color: var(--danger); }
+
+/* ═══════════════════════════════════════════════
+   Layout
+   ═══════════════════════════════════════════════ */
+.main {
+  max-width: 1440px; margin: 0 auto; padding: 20px 24px;
+  display: grid; grid-template-columns: 400px 1fr;
+  gap: 20px; align-items: start;
+}
+@media (max-width: 960px) { .main { grid-template-columns: 1fr; } }
+
+/* ═══════════════════════════════════════════════
+   Tabs
+   ═══════════════════════════════════════════════ */
+.tabs {
+  display: flex; gap: 2px; margin-bottom: 16px;
+  padding: 3px; background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-theme);
+}
+.tab {
+  flex: 1; padding: 7px 16px; border: none; background: transparent;
+  border-radius: var(--radius); cursor: pointer;
+  font-size: 13px; font-weight: 500; font-family: var(--font);
+  color: var(--text-tertiary); text-align: center;
+  transition: all var(--transition);
+}
+.tab:hover { color: var(--text-secondary); }
+.tab.active { background: var(--bg-surface); color: var(--text-primary); box-shadow: var(--shadow-sm); }
+.tab .count { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
+
+/* ═══════════════════════════════════════════════
+   Task Cards
+   ═══════════════════════════════════════════════ */
+.task-list { display: flex; flex-direction: column; gap: 8px; }
+.task-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 16px;
+  transition: all var(--transition);
+}
+.task-card:hover { background: var(--bg-card-hover); border-color: var(--border-input); }
+.task-card .task-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.task-card .task-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.task-card .task-desc {
+  font-size: 13px; color: var(--text-secondary);
+  line-height: 1.5; margin: 6px 0; white-space: pre-wrap;
+  max-height: 80px; overflow-y: auto;
+}
+.task-card .task-meta {
+  font-size: 11px; color: var(--text-tertiary);
+  display: flex; gap: 12px; align-items: center;
+}
+.task-card .task-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* Badges */
+.badge {
+  font-size: 10px; font-weight: 600; padding: 2px 8px;
+  border-radius: var(--radius-sm); letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.badge.critical { background: var(--danger-bg); color: var(--danger); }
+.badge.high { background: var(--warning-bg); color: var(--warning); }
+.badge.normal { background: var(--bg-badge); color: var(--text-tertiary); }
+.badge.low { background: var(--bg-badge); color: var(--text-muted); }
+.badge.tool { background: var(--accent-bg); color: var(--accent-light); }
+.badge.completed { background: var(--success-bg); color: var(--success); }
+.badge.rejected { background: var(--danger-bg); color: var(--danger); }
+.badge.cancelled { background: var(--warning-bg); color: var(--warning); }
+
+/* ═══════════════════════════════════════════════
+   Buttons
+   ═══════════════════════════════════════════════ */
+.btn {
+  padding: 6px 14px; border-radius: var(--radius);
+  border: 1px solid var(--border); cursor: pointer;
+  font-size: 13px; font-weight: 500; font-family: var(--font);
+  background: var(--bg-hover); color: var(--text-secondary);
+  transition: all var(--transition);
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.btn:hover { background: var(--bg-active); color: var(--text-primary); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: var(--accent-hover); }
+
+.btn.complete { background: var(--success-bg); border-color: transparent; color: var(--success); }
+.btn.complete:hover { background: var(--success); color: #fff; }
+
+.btn.reject { background: var(--danger-bg); border-color: transparent; color: var(--danger); }
+.btn.reject:hover { background: var(--danger); color: #fff; }
+
+.btn.cancel { background: var(--warning-bg); border-color: transparent; color: var(--warning); }
+.btn.cancel:hover { background: var(--warning); color: #000; }
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ═══════════════════════════════════════════════
+   History
+   ═══════════════════════════════════════════════ */
+.history-group { margin-bottom: 20px; }
+.history-date {
+  font-size: 12px; font-weight: 600; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.history-item {
+  padding: 10px 14px; border-left: 2px solid var(--border);
+  margin-bottom: 4px; font-size: 13px; transition: border-color var(--transition);
+}
+.history-item:hover { border-left-color: var(--accent); }
+.history-item .result-summary { font-size: 12px; color: var(--text-tertiary); margin-top: 3px; }
+
+/* ═══════════════════════════════════════════════
+   Conversation Panel
+   ═══════════════════════════════════════════════ */
+.conv-panel {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+  display: flex; flex-direction: column;
+  position: sticky; top: 72px;
+  max-height: calc(100vh - 100px);
+  transition: background var(--transition-theme), border-color var(--transition-theme);
+}
+.conv-header {
+  padding: 12px 16px; border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px; font-weight: 600; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 8px;
+  transition: border-color var(--transition-theme);
+}
+.conv-header .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+.conv-stats { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: auto; }
+.conv-actions { display: flex; gap: 4px; }
+.conv-action-btn {
+  background: none; border: 1px solid var(--border-subtle);
+  color: var(--text-muted); cursor: pointer; font-size: 14px;
+  padding: 2px 6px; border-radius: var(--radius-sm);
+  transition: all var(--transition); line-height: 1;
+}
+.conv-action-btn:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
+
+/* Workdir selector */
+.workdir-select {
+  background: var(--bg-elevated); color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 3px 20px 3px 8px; font-size: 11px; font-family: var(--font);
+  font-weight: 500; cursor: pointer; max-width: 130px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a8f98'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  transition: all var(--transition);
+}
+.workdir-select:hover { border-color: var(--border-input); }
+.workdir-select:focus { outline: none; border-color: var(--accent); }
+.workdir-select option {
+  background: var(--bg-surface); color: var(--text-primary);
+}
+.conv-messages {
+  flex: 1; overflow-y: auto; padding: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.conv-msg {
+  padding: 8px 12px; border-radius: var(--radius-md);
+  font-size: 13px; line-height: 1.5; white-space: pre-wrap;
+  word-break: break-word; max-width: 100%;
+  transition: background var(--transition-theme);
+}
+.conv-msg.user {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  align-self: flex-end;
+}
+.conv-msg.agent {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  align-self: flex-start;
+}
+.conv-msg .msg-meta {
+  font-size: 10px; font-weight: 500; color: var(--text-muted);
+  margin-bottom: 3px; letter-spacing: 0.2px;
+}
+.conv-msg .msg-meta .tag {
+  font-size: 9px; font-weight: 600; text-transform: uppercase;
+  padding: 1px 5px; border-radius: var(--radius-sm); margin-right: 6px;
+}
+.conv-msg .msg-meta .tag.user { background: var(--accent-bg); color: var(--accent-light); }
+.conv-msg .msg-meta .tag.agent { background: var(--success-bg); color: var(--success); }
+.conv-empty {
+  color: var(--text-muted); text-align: center;
+  padding: 24px; font-size: 13px;
+}
+.conv-input-area {
+  padding: 10px 12px; border-top: 1px solid var(--border-subtle);
+  display: flex; gap: 8px; align-items: flex-end;
+  transition: border-color var(--transition-theme);
+}
+.conv-input-area textarea {
+  flex: 1; background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-input); border-radius: var(--radius);
+  padding: 8px 10px; font-size: 13px; font-family: var(--font);
+  resize: none; min-height: 36px; max-height: 80px;
+  transition: all var(--transition);
+}
+.conv-input-area textarea:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.conv-input-area .btn-send {
+  flex-shrink: 0; height: 36px; width: 36px;
+  padding: 0; display: flex; align-items: center; justify-content: center;
+}
+
+/* ═══════════════════════════════════════════════
+   Modal
+   ═══════════════════════════════════════════════ */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: var(--bg-modal-overlay); z-index: 100;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 24px;
+  width: 460px; max-width: 90vw; max-height: 80vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  transition: background var(--transition-theme), border-color var(--transition-theme);
+}
+.modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-primary); }
+.modal label {
+  display: block; font-size: 12px; font-weight: 500;
+  color: var(--text-tertiary); margin-bottom: 4px; margin-top: 12px;
+}
+.modal textarea, .modal select, .modal input {
+  width: 100%; background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-input); border-radius: var(--radius);
+  padding: 8px 10px; font-size: 13px; font-family: var(--font);
+  transition: all var(--transition);
+}
+.modal textarea { font-family: var(--font-mono); resize: vertical; min-height: 60px; }
+.modal textarea:focus, .modal select:focus, .modal input:focus {
+  outline: none; border-color: var(--accent);
+}
+.modal select { cursor: pointer; }
+.modal .btn-row { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+.modal .hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* Reason selector buttons */
+.reason-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.reason-btn {
+  padding: 8px 14px; border-radius: var(--radius);
+  border: 1px solid var(--border); cursor: pointer;
+  font-size: 13px; font-weight: 500; font-family: var(--font);
+  background: var(--bg-input); color: var(--text-secondary);
+  transition: all var(--transition);
+}
+.reason-btn:hover { border-color: var(--danger); color: var(--danger); }
+.reason-btn.selected { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
+.reason-btn:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
+
+/* ═══════════════════════════════════════════════
+   Toast
+   ═══════════════════════════════════════════════ */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 200;
+  background: var(--bg-elevated); color: var(--text-primary);
+  padding: 10px 18px; border-radius: var(--radius);
+  font-size: 13px; font-weight: 500;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  opacity: 0; transform: translateY(8px);
+  transition: all var(--transition);
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* ═══════════════════════════════════════════════
+   States
+   ═══════════════════════════════════════════════ */
+.empty-state, .loading-state {
+  text-align: center; padding: 40px 20px;
+  color: var(--text-muted); font-size: 14px;
+}
+.empty-state svg { width: 32px; height: 32px; margin-bottom: 8px; opacity: 0.3; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-input); }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; } }
 </style>
 </head>
 <body>
-<h1>HumanMCP Dashboard <span id="status-badge" class="connection-status disconnected">disconnected</span></h1>
-<p class="subtitle">AI 委派的人类任务看板 — 按优先级排序，完成或拒绝后 AI 自动获取结果</p>
 
-<div class="tabs" role="tablist">
-  <button class="tab active" role="tab" aria-selected="true" data-tab="pending">待处理 (<span id="pending-count">0</span>)</button>
-  <button class="tab" role="tab" aria-selected="false" data-tab="history">历史</button>
-</div>
+<!-- ════════════════ HEADER ════════════════ -->
+<header class="header">
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="header-logo">Human<span>MCP</span> Dashboard</div>
+      <span id="status-badge" class="status-badge disconnected">disconnected</span>
+    </div>
+    <div class="header-right">
+      <button class="theme-toggle" id="theme-toggle" title="切换主题">
+        <svg id="theme-icon-sun" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 8 1zm0 10a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm6.5-2.5a.5.5 0 0 1 0 1h-1a.5.5 0 0 1 0-1h1zM8 13a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 8 13zm-6.5-4.5a.5.5 0 0 1 0 1h-1a.5.5 0 0 1 0-1h1zm.646-5.354a.5.5 0 0 1 .708 0l.707.707a.5.5 0 0 1-.708.708l-.707-.707a.5.5 0 0 1 0-.708zM12.44 11.44a.5.5 0 0 1 .708 0l.707.707a.5.5 0 0 1-.707.707l-.707-.707a.5.5 0 0 1 0-.708zM1.854 2.854a.5.5 0 1 1 0 .708l-.707.707a.5.5 0 0 1-.708-.708l.707-.707a.5.5 0 0 1 .708 0zM11.44 1.44a.5.5 0 0 1 0 .708l-.707.707a.5.5 0 0 1-.708-.708l.707-.707a.5.5 0 0 1 .708 0z"/></svg>
+        <svg id="theme-icon-moon" viewBox="0 0 16 16" fill="currentColor" style="display:none"><path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
 
-<div id="task-list"><div class="loading">加载中...</div></div>
+<!-- ════════════════ MAIN ════════════════ -->
+<div class="main">
+  <!-- Left: Tasks -->
+  <div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" role="tab" data-tab="pending">待处理<span class="count" id="pending-count">0</span></button>
+      <button class="tab" role="tab" data-tab="history">历史</button>
+    </div>
+    <div class="task-list" id="task-list">
+      <div class="loading-state">加载中...</div>
+    </div>
+  </div>
 
-<!-- Complete Modal -->
-<div class="modal-overlay" id="complete-modal" role="dialog" aria-modal="true" aria-labelledby="complete-modal-heading">
-  <div class="modal">
-    <h3 id="complete-modal-heading">✓ 完成任务</h3>
-    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;" id="complete-task-title"></div>
-    <label for="complete-result">结果 <span style="color:#f85149">*</span></label>
-    <textarea id="complete-result" rows="3" placeholder="描述执行结果..."></textarea>
-    <label for="complete-evidence">证据（可选，每行一个路径或链接）</label>
-    <textarea id="complete-evidence" rows="2" placeholder="截图路径&#10;日志文件路径&#10;..."></textarea>
-    <div class="btn-row">
-      <button class="btn" data-modal-close="complete-modal">取消</button>
-      <button class="btn complete" id="complete-submit-btn">提交</button>
+  <!-- Right: Conversation -->
+  <div class="conv-panel" id="conv-panel">
+    <div class="conv-header">
+      <span class="dot"></span>Agent 会话
+      <select class="workdir-select" id="workdir-select" title="工作目录">
+        <option value="G:\DJ01\Game\DJ01">DJ01 Game</option>
+        <option value="H:\Human">HumanMCP</option>
+        <option value="F:\hermes-agent">Hermes Agent</option>
+        <option value="__custom__">📂 自定义...</option>
+      </select>
+      <span class="conv-stats" id="conv-stats">0 条消息</span>
+      <div class="conv-actions">
+        <button class="conv-action-btn" id="conv-clear-btn" title="清除上下文">🗑</button>
+      </div>
+    </div>
+    <div class="conv-messages" id="conv-messages">
+      <div class="conv-empty">等待 Dashboard 操作...</div>
+    </div>
+    <div class="conv-input-area">
+      <textarea id="conv-input" rows="1" placeholder="输入消息..."></textarea>
+      <button class="btn primary btn-send" id="conv-send-btn" title="发送">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/></svg>
+      </button>
     </div>
   </div>
 </div>
 
-<!-- Reject Modal -->
-<div class="modal-overlay" id="reject-modal" role="dialog" aria-modal="true" aria-labelledby="reject-modal-heading">
+<!-- ════════════════ MODALS ════════════════ -->
+<div class="modal-overlay" id="complete-modal">
   <div class="modal">
-    <h3 id="reject-modal-heading">✗ 拒绝任务</h3>
-    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;" id="reject-task-title"></div>
-    <label for="reject-reason">拒绝理由 <span style="color:#f85149">*</span></label>
-    <select id="reject-reason">
-      <option value="">-- 选择理由 --</option>
-      <option value="ai_can_do">AI 可以自己完成 — 这个任务 AI 有能力做</option>
-      <option value="unclear">需求描述不清楚 — 我看不懂要做什么</option>
-      <option value="out_of_scope">超出我的能力/职责范围</option>
-      <option value="invalid_task">任务前提有误，无法执行</option>
-    </select>
-    <label for="reject-note">补充说明（可选）</label>
-    <textarea id="reject-note" rows="2" placeholder="可选：补充说明..."></textarea>
+    <h3>✓ 完成任务</h3>
+    <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:12px;" id="complete-task-title"></div>
+    <label>结果 <span style="color:var(--danger)">*</span></label>
+    <textarea id="complete-result" rows="3" placeholder="描述执行结果..."></textarea>
+    <label>证据（可选，每行一个路径或链接）</label>
+    <textarea id="complete-evidence" rows="2" placeholder="截图路径"></textarea>
+    <div class="btn-row">
+      <button class="btn" data-modal-close="complete-modal">取消</button>
+      <button class="btn primary" id="complete-submit-btn">提交</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="reject-modal">
+  <div class="modal">
+    <h3>✗ 拒绝任务</h3>
+    <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:12px;" id="reject-task-title"></div>
+    <label>理由 <span style="color:var(--danger)">*</span></label>
+    <div class="reason-options" id="reject-reasons">
+      <button class="reason-btn selected" data-reason="ai_can_do">🤖 AI 可以自己做</button>
+      <button class="reason-btn" data-reason="unclear">❓ 指令不清晰</button>
+      <button class="reason-btn" data-reason="out_of_scope">🚫 超出范围</button>
+      <button class="reason-btn" data-reason="invalid_task">⚠️ 无效任务</button>
+    </div>
+    <label>备注</label>
+    <textarea id="reject-note" rows="2" placeholder="可选备注..."></textarea>
     <div class="btn-row">
       <button class="btn" data-modal-close="reject-modal">取消</button>
       <button class="btn reject" id="reject-submit-btn">提交</button>
@@ -156,23 +547,42 @@
   </div>
 </div>
 
-<!-- Toast -->
-<div class="toast" id="toast" aria-live="polite"></div>
+<div class="toast" id="toast"></div>
 
 <script>
 (function () {
   'use strict';
-
   const API = '/api';
   let currentTab = 'pending';
   let ws = null;
   let currentTaskId = null;
   let pollTimer = null;
+  let convPollTimer = null;
   let reconnectTimer = null;
   let reconnectDelay = 3000;
   const MAX_RECONNECT_DELAY = 60000;
 
-  // ---- Helpers ----
+  // ════════════ Theme ════════════
+  const html = document.documentElement;
+  const themeToggle = document.getElementById('theme-toggle');
+  const iconSun = document.getElementById('theme-icon-sun');
+  const iconMoon = document.getElementById('theme-icon-moon');
+
+  function applyTheme(theme) {
+    html.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    iconSun.style.display = theme === 'dark' ? '' : 'none';
+    iconMoon.style.display = theme === 'light' ? '' : 'none';
+  }
+
+  const saved = localStorage.getItem('theme') || 'dark';
+  applyTheme(saved);
+
+  themeToggle.addEventListener('click', () => {
+    applyTheme(html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+
+  // ════════════ Helpers ════════════
   function escapeHtml(s) {
     if (!s) return '';
     const el = document.createElement('span');
@@ -189,55 +599,54 @@
     if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
     return Math.floor(diff / 86400) + ' 天前';
   }
-  function deadlineText(minutes) {
-    if (!minutes || minutes <= 0) return '';
-    if (minutes <= 30) return '截止 ' + minutes + ' 分钟后';
-    if (minutes <= 120) return '截止 ' + Math.floor(minutes / 60) + ' 小时后';
-    return '';
-  }
 
-  // ---- WebSocket ----
+  // ════════════ WebSocket ════════════
   function connectWS() {
     if (ws && ws.readyState === WebSocket.OPEN) return;
-
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Read token from localStorage for authenticated WebSocket connections.
     const token = localStorage.getItem('ws_token') || '';
     const wsUrl = proto + '//' + location.host + '/ws' + (token ? '?token=' + encodeURIComponent(token) : '');
-
     ws = new WebSocket(wsUrl);
-    ws.onopen = function () {
+    ws.onopen = () => {
       document.getElementById('status-badge').textContent = 'connected';
-      document.getElementById('status-badge').className = 'connection-status connected';
-      reconnectDelay = 3000; // Reset backoff.
+      document.getElementById('status-badge').className = 'status-badge connected';
+      reconnectDelay = 3000;
       loadTasks();
+      // Auto-set home channel on first connect
+      if (!localStorage.getItem('sethome_done')) {
+        setTimeout(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'user_chat', text: '/sethome' }));
+            localStorage.setItem('sethome_done', '1');
+          }
+        }, 2000);
+      }
     };
-    ws.onclose = function (evt) {
+    ws.onclose = () => {
       document.getElementById('status-badge').textContent = 'disconnected';
-      document.getElementById('status-badge').className = 'connection-status disconnected';
+      document.getElementById('status-badge').className = 'status-badge disconnected';
       scheduleReconnect();
     };
-    ws.onmessage = function (e) {
+    ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'new_task' || msg.type === 'task_updated') {
           if (currentTab === 'pending') loadTasks();
         }
-      } catch (_) { /* ignore malformed messages */ }
+      } catch (_) {}
     };
-    ws.onerror = function () { ws.close(); };
+    ws.onerror = () => { ws.close(); };
   }
-
   function scheduleReconnect() {
     if (reconnectTimer) return;
-    reconnectTimer = setTimeout(function () {
+    reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
       connectWS();
     }, reconnectDelay);
   }
 
-  // ---- Polling (fallback) ----
+  // ════════════ Task Loading ════════════
   function startPolling() {
     stopPolling();
     pollTimer = setInterval(loadTasks, 15000);
@@ -245,18 +654,262 @@
   function stopPolling() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopPolling();
+    else { if (currentTab === 'pending') loadTasks(); startPolling(); }
+  });
 
-  // Pause polling when page is hidden, resume when visible.
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden) {
-      stopPolling();
+  async function loadTasks() {
+    const list = document.getElementById('task-list');
+    try {
+      const url = currentTab === 'pending' ? API + '/tasks/pending' : API + '/tasks/history?limit=100&offset=0';
+      const resp = await fetch(url);
+      if (!resp.ok) { list.innerHTML = '<div class="empty-state">加载失败 (' + resp.status + ')</div>'; return; }
+      const tasks = await resp.json();
+
+      if (currentTab === 'pending') {
+        document.getElementById('pending-count').textContent = tasks.length;
+        if (!tasks.length) { list.innerHTML = '<div class="empty-state"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.5 5.5a.5.5 0 0 1 1 0v3a.5.5 0 0 1-1 0v-3zm0 5a.5.5 0 0 1 1 0v.5a.5.5 0 0 1-1 0v-.5z"/></svg><div>暂无待处理任务</div></div>'; return; }
+        list.innerHTML = tasks.map(renderPendingTask).join('');
+      } else {
+        if (!tasks.length) { list.innerHTML = '<div class="empty-state">暂无历史记录</div>'; return; }
+        list.innerHTML = renderHistory(tasks);
+      }
+    } catch (err) {
+      list.innerHTML = '<div class="empty-state">加载失败: ' + escapeHtml(err.message || '网络错误') + '</div>';
+    }
+  }
+
+  function renderPendingTask(t) {
+    let cancelHtml = '';
+    if (t.cancel_requested) {
+      cancelHtml = '<span class="badge cancelled">AI请求取消</span> ' +
+        '<button class="btn cancel" style="margin-left:4px;font-size:11px;padding:3px 8px;" data-confirm-cancel="' + escapeHtml(t.task_id) + '">确认取消</button>';
+    }
+    let actions = '';
+    if (!t.cancel_requested) {
+      actions = '<div class="task-actions">' +
+        '<button class="btn complete" data-complete="' + escapeHtml(t.task_id) + '" data-title="' + escapeHtml(t.title) + '">✓ 完成</button>' +
+        '<button class="btn reject" data-reject="' + escapeHtml(t.task_id) + '" data-title="' + escapeHtml(t.title) + '">✗ 拒绝</button>' +
+        '</div>';
+    }
+    return '<div class="task-card">' +
+      '<div class="task-header">' +
+        '<span class="badge ' + escapeHtml(t.priority) + '">' + escapeHtml(t.priority) + '</span>' +
+        '<span class="badge tool">' + escapeHtml(t.tool_name) + '</span>' +
+        cancelHtml +
+        '<span style="margin-left:auto;font-size:10px;color:var(--text-muted);">' + escapeHtml(t.agent_id) + ' · ' + timeAgo(t.created_at) + '</span>' +
+      '</div>' +
+      '<div class="task-title">' + escapeHtml(t.title) + '</div>' +
+      '<div class="task-desc">' + escapeHtml(t.description) + '</div>' +
+      actions +
+    '</div>';
+  }
+
+  function renderHistory(tasks) {
+    const groups = {};
+    tasks.forEach(t => {
+      const date = (t.completed_at || t.created_at || '').slice(0, 10) || '未知日期';
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(t);
+    });
+    return Object.entries(groups).sort((a,b) => b[0].localeCompare(a[0])).map(([date, items]) =>
+      '<div class="history-group"><div class="history-date">' + date + '</div>' +
+      items.map(t => {
+        const icon = t.status === 'completed' ? '✓' : '✗';
+        const summary = t.status === 'completed' ? (t.result || '').slice(0, 100) : (t.rejection_reason || '未知') + (t.rejection_note ? ': ' + t.rejection_note.slice(0, 60) : '');
+        const time = (t.completed_at || '').slice(11, 16) || '';
+        return '<div class="history-item">' +
+          '<span class="badge ' + (t.status === 'completed' ? 'completed' : 'rejected') + '">' + icon + '</span> ' +
+          '<span style="margin-left:6px;">' + escapeHtml(t.title) + '</span>' +
+          '<span style="float:right;font-size:11px;color:var(--text-muted);">' + time + '</span>' +
+          '<div class="result-summary">' + escapeHtml(summary) + '</div></div>';
+      }).join('') + '</div>'
+    ).join('');
+  }
+
+  // ════════════ Conversation ════════════
+  async function loadConversation() {
+    try {
+      const resp = await fetch(API + '/session/messages?limit=50');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const msgs = data.messages || [];
+      const container = document.getElementById('conv-messages');
+      if (msgs.length === 0) {
+        container.innerHTML = '<div class="conv-empty">等待 Dashboard 操作...</div>';
+        return;
+      }
+      // Only auto-scroll if user is already near the bottom
+      const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+      container.innerHTML = msgs.map(m => {
+        const time = (m.timestamp || '').slice(11, 19) || '';
+        const roleTag = m.role === 'agent' ? 'Agent' : 'Dashboard';
+        return '<div class="conv-msg ' + m.role + '">' +
+          '<div class="msg-meta"><span class="tag ' + m.role + '">' + roleTag + '</span>' + time + '</div>' +
+          m.text +
+        '</div>';
+      }).join('');
+      if (wasAtBottom) container.scrollTop = container.scrollHeight;
+      // Update message count
+      document.getElementById('conv-stats').textContent = msgs.length + ' 条消息';
+    } catch (e) {}
+  }
+  function startConvPolling() { loadConversation(); convPollTimer = setInterval(loadConversation, 2000); }
+
+  function sendChat() {
+    var input = document.getElementById('conv-input');
+    var text = input.value.trim();
+    if (!text) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) { showToast('WebSocket 未连接'); return; }
+    ws.send(JSON.stringify({ type: 'user_chat', text: text }));
+    input.value = '';
+    input.focus();
+    setTimeout(loadConversation, 400);
+  }
+
+  // Bind send button and Enter key
+  document.getElementById('conv-send-btn').addEventListener('click', sendChat);
+  document.getElementById('conv-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+
+  // Workdir selector
+  var workdirSelect = document.getElementById('workdir-select');
+  var _lastWorkdirSent = null;
+  // Load saved
+  var savedDir = localStorage.getItem('workdir');
+  if (savedDir) {
+    var found = false;
+    for (var i = 0; i < workdirSelect.options.length; i++) {
+      if (workdirSelect.options[i].value === savedDir) { found = true; break; }
+    }
+    if (!found && savedDir !== '__custom__') {
+      var opt = document.createElement('option');
+      opt.value = savedDir;
+      opt.textContent = savedDir.split('\\').pop() || savedDir;
+      workdirSelect.insertBefore(opt, workdirSelect.lastElementChild);
+    }
+    if (savedDir !== '__custom__') workdirSelect.value = savedDir;
+  }
+
+  function setWorkdir(dir, force) {
+    if (!dir || dir === '__custom__') return;
+    if (!force && dir === _lastWorkdirSent) return;
+    _lastWorkdirSent = dir;
+    localStorage.setItem('workdir', dir);
+    workdirSelect.value = dir;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'workdir_changed', workdir: dir }));
+    }
+  }
+
+  workdirSelect.addEventListener('change', function() {
+    if (this.value === '__custom__') {
+      pickDirectory();
     } else {
-      if (currentTab === 'pending') loadTasks();
-      startPolling();
+      setWorkdir(this.value);
     }
   });
 
-  // ---- Modal helpers ----
+  async function pickDirectory() {
+    // Try native directory picker (Edge/Chrome)
+    if (window.showDirectoryPicker) {
+      try {
+        var handle = await window.showDirectoryPicker({ mode: 'read' });
+        // Prompt with folder name as hint, user confirms full path
+        var fullPath = prompt('确认工作目录路径：', handle.name);
+        if (fullPath && fullPath.trim()) {
+          addAndSelectDir(fullPath.trim());
+        } else {
+          workdirSelect.value = localStorage.getItem('workdir') || workdirSelect.options[0].value;
+        }
+      } catch (e) {
+        // User cancelled or not supported
+        workdirSelect.value = localStorage.getItem('workdir') || workdirSelect.options[0].value;
+      }
+    } else {
+      // Fallback: prompt
+      var custom = prompt('输入工作目录路径（例如 D:\\Projects）：');
+      if (custom && custom.trim()) {
+        addAndSelectDir(custom.trim());
+      } else {
+        workdirSelect.value = localStorage.getItem('workdir') || workdirSelect.options[0].value;
+      }
+    }
+  }
+
+  function addAndSelectDir(path) {
+    // Add to dropdown if not exists
+    var found = false;
+    for (var i = 0; i < workdirSelect.options.length; i++) {
+      if (workdirSelect.options[i].value === path) { found = true; break; }
+    }
+    if (!found) {
+      var opt = document.createElement('option');
+      opt.value = path;
+      opt.textContent = path.split('\\').pop() || path;
+      workdirSelect.insertBefore(opt, workdirSelect.lastElementChild);
+    }
+    setWorkdir(path);
+  }
+
+  // Auto-set workdir on first connect and after /new
+  var _origConnectWS = connectWS;
+  connectWS = function() {
+    _origConnectWS();
+    var check = setInterval(function() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        clearInterval(check);
+        // Wait for /sethome to finish, then set workdir
+        setTimeout(function() { setWorkdir(null, true); }, 3000);
+      }
+    }, 500);
+  };
+
+  // Clear context button
+  document.getElementById('conv-clear-btn').addEventListener('click', async () => {
+    if (!confirm('确定清除 Agent 会话上下文？这将清空对话历史。')) return;
+    try {
+      await fetch(API + '/session/messages?_=' + Date.now(), { method: 'DELETE' });
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'user_chat', text: '/new' }));
+        setTimeout(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'user_chat', text: '/approve' }));
+          }
+        }, 800);
+      }
+      localStorage.removeItem('sethome_done');
+      document.getElementById('conv-messages').innerHTML = '<div class="conv-empty">上下文已清除 ✓</div>';
+      document.getElementById('conv-stats').textContent = '0 条消息';
+      showToast('🗑 上下文已清除');
+      setTimeout(async () => {
+        await fetch(API + '/session/messages?_=' + Date.now(), { method: 'DELETE' });
+        // Auto-set workdir on new session
+        _lastWorkdirSent = null;
+        setTimeout(function() { setWorkdir(null, true); }, 2000);
+        loadConversation();
+      }, 4000);
+    } catch (e) { showToast('清除失败: ' + e.message); }
+  });
+
+  // ════════════ Tabs ════════════
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(el => {
+      const active = el.dataset.tab === tab;
+      el.classList.toggle('active', active);
+      el.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    loadTasks();
+  }
+  document.querySelector('.tabs').addEventListener('click', e => {
+    const tab = e.target.closest('[data-tab]');
+    if (tab) switchTab(tab.dataset.tab);
+  });
+
+  // ════════════ Modals ════════════
   function openModal(id, taskId, title) {
     currentTaskId = taskId;
     if (id === 'complete-modal') {
@@ -266,240 +919,94 @@
     }
     if (id === 'reject-modal') {
       document.getElementById('reject-task-title').textContent = title;
-      document.getElementById('reject-reason').value = '';
       document.getElementById('reject-note').value = '';
-    }
-    var overlay = document.getElementById(id);
-    overlay.classList.add('active');
-    // Focus the first form element.
-    var firstInput = overlay.querySelector('textarea, select, input');
-    if (firstInput) firstInput.focus();
-  }
-  function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
-    currentTaskId = null;
-  }
-
-  // ---- Event delegation for task list ----
-  document.getElementById('task-list').addEventListener('click', function (e) {
-    var btn = e.target.closest('button');
-    if (!btn) return;
-
-    // Complete button
-    if (btn.dataset.complete) {
-      openModal('complete-modal', btn.dataset.complete, btn.dataset.title || '');
-      return;
-    }
-    // Reject button
-    if (btn.dataset.reject) {
-      openModal('reject-modal', btn.dataset.reject, btn.dataset.title || '');
-      return;
-    }
-    // Confirm cancel button
-    if (btn.dataset.confirmCancel) {
-      confirmCancel(btn.dataset.confirmCancel);
-      return;
-    }
-  });
-
-  // ---- Tab switching ----
-  document.querySelector('.tabs').addEventListener('click', function (e) {
-    var tab = e.target.closest('button[data-tab]');
-    if (!tab) return;
-    switchTab(tab.dataset.tab);
-  });
-  document.querySelector('.tabs').addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-      e.preventDefault();
-      var tabs = Array.from(document.querySelectorAll('button[data-tab]'));
-      var idx = tabs.indexOf(document.activeElement);
-      if (e.key === 'ArrowRight') idx = (idx + 1) % tabs.length;
-      else idx = (idx - 1 + tabs.length) % tabs.length;
-      tabs[idx].focus();
-      tabs[idx].click();
-    }
-  });
-
-  // ---- Modal close: ESC key + overlay click + close buttons ----
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') {
-      var activeModal = document.querySelector('.modal-overlay.active');
-      if (activeModal) closeModal(activeModal.id);
-    }
-  });
-  document.addEventListener('click', function (e) {
-    // Overlay click
-    if (e.target.classList.contains('modal-overlay') && e.target.classList.contains('active')) {
-      closeModal(e.target.id);
-    }
-    // Close button
-    if (e.target.dataset.modalClose) {
-      closeModal(e.target.dataset.modalClose);
-    }
-  });
-
-  // ---- Task loading ----
-  async function loadTasks() {
-    var list = document.getElementById('task-list');
-    try {
-      var url = currentTab === 'pending'
-        ? API + '/tasks/pending'
-        : API + '/tasks/history?limit=100&offset=0';
-      var resp = await fetch(url);
-
-      if (!resp.ok) {
-        var errText = '服务器错误 (' + resp.status + ')';
-        try { var errBody = await resp.json(); errText = errBody.error || errText; } catch (_) {}
-        list.innerHTML = '<div class="error">加载失败: ' + escapeHtml(errText) + '</div>';
-        return;
-      }
-
-      var tasks = await resp.json();
-
-      if (currentTab === 'pending') {
-        document.getElementById('pending-count').textContent = tasks.length;
-        if (!tasks.length) {
-          list.innerHTML = '<div class="empty">暂无待处理任务</div>';
-          return;
-        }
-        list.innerHTML = tasks.map(renderPendingTask).join('');
-      } else {
-        if (!tasks.length) {
-          list.innerHTML = '<div class="empty">暂无历史记录</div>';
-          return;
-        }
-        list.innerHTML = renderHistory(tasks);
-      }
-    } catch (err) {
-      list.innerHTML = '<div class="error">加载失败: ' + escapeHtml(err.message || '网络错误') + '</div>';
-    }
-  }
-
-  function renderPendingTask(t) {
-    var cancelHtml = '';
-    if (t.cancel_requested) {
-      cancelHtml = '<span class="badge cancelled">AI请求取消</span> ' +
-        '<button class="btn confirm-cancel" style="margin-left:4px;" data-confirm-cancel="' + escapeHtml(t.task_id) + '">确认取消</button>';
-    }
-
-    var actions = '';
-    if (!t.cancel_requested) {
-      actions = '<div class="actions">' +
-        '<button class="btn complete" data-complete="' + escapeHtml(t.task_id) + '" data-title="' + escapeHtml(t.title) + '">✓ 完成</button> ' +
-        '<button class="btn reject" data-reject="' + escapeHtml(t.task_id) + '" data-title="' + escapeHtml(t.title) + '">✗ 拒绝</button>' +
-        '</div>';
-    }
-
-    return '<div class="task-card">' +
-      '<div class="header">' +
-        '<span class="badge priority-' + escapeHtml(t.priority) + '">' + escapeHtml(t.priority) + '</span> ' +
-        '<span class="badge tool">' + escapeHtml(t.tool_name) + '</span> ' +
-        cancelHtml +
-        '<span style="margin-left:auto;font-size:11px;color:var(--text-secondary);">' + escapeHtml(t.agent_id) + ' · ' + timeAgo(t.created_at) + ' · ' + deadlineText(t.deadline_minutes) + '</span>' +
-      '</div>' +
-      '<div class="title">' + escapeHtml(t.title) + '</div>' +
-      '<div class="desc">' + escapeHtml(t.description) + '</div>' +
-      actions +
-    '</div>';
-  }
-
-  function renderHistory(tasks) {
-    var groups = {};
-    tasks.forEach(function (t) {
-      var date = (t.completed_at || t.created_at || '').slice(0, 10) || '未知日期';
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(t);
-    });
-
-    return Object.entries(groups).sort(function (a, b) { return b[0].localeCompare(a[0]); }).map(function (entry) {
-      var date = entry[0];
-      var items = entry[1];
-      return '<div class="history-group">' +
-        '<div class="history-date">' + date + '</div>' +
-        items.map(function (t) {
-          var icon = t.status === 'completed' ? '✓' : '✗';
-          var summary = t.status === 'completed'
-            ? (t.result || '').slice(0, 100)
-            : (t.rejection_reason || '未知') + (t.rejection_note ? ': ' + t.rejection_note.slice(0, 60) : '');
-          var time = (t.completed_at || '').slice(11, 16) || '';
-          return '<div class="history-item">' +
-            '<span class="badge ' + (t.status === 'completed' ? 'completed' : 'rejected') + '">' + icon + '</span> ' +
-            '<span style="margin-left:6px;">' + escapeHtml(t.title) + '</span>' +
-            '<span style="float:right;font-size:12px;color:var(--text-secondary);">' + time + '</span>' +
-            '<div class="result-summary">' + escapeHtml(summary) + '</div>' +
-          '</div>';
-        }).join('') +
-      '</div>';
-    }).join('');
-  }
-
-  // ---- Actions ----
-  document.getElementById('complete-submit-btn').addEventListener('click', async function () {
-    if (!currentTaskId) return;
-    var result = document.getElementById('complete-result').value.trim();
-    if (!result) { showToast('请填写结果'); return; }
-    var evidenceRaw = document.getElementById('complete-evidence').value.trim();
-    var evidence = evidenceRaw ? evidenceRaw.split('\n').map(function (s) { return s.trim(); }).filter(Boolean) : [];
-
-    try {
-      var resp = await fetch(API + '/tasks/' + currentTaskId + '/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ result: result, evidence: evidence })
+      // Reset reason buttons to default (ai_can_do)
+      document.querySelectorAll('#reject-reasons .reason-btn').forEach(b => {
+        b.classList.toggle('selected', b.dataset.reason === 'ai_can_do');
       });
-      if (resp.ok) { closeModal('complete-modal'); loadTasks(); showToast('任务已完成'); }
-      else { var body = await resp.json().catch(function () { return {}; }); showToast('失败: ' + (body.error || '未知错误')); }
+    }
+    document.getElementById(id).classList.add('active');
+    const fi = document.getElementById(id).querySelector('textarea, select, input');
+    if (fi) fi.focus();
+  }
+  function closeModal(id) { document.getElementById(id).classList.remove('active'); currentTaskId = null; }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { const m = document.querySelector('.modal-overlay.active'); if (m) closeModal(m.id); } });
+  document.addEventListener('click', e => {
+    if (e.target.classList.contains('modal-overlay') && e.target.classList.contains('active')) closeModal(e.target.id);
+    if (e.target.dataset.modalClose) closeModal(e.target.dataset.modalClose);
+  });
+
+  // ════════════ Task Actions ════════════
+  document.getElementById('task-list').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.complete) openModal('complete-modal', btn.dataset.complete, btn.dataset.title || '');
+    if (btn.dataset.reject) openModal('reject-modal', btn.dataset.reject, btn.dataset.title || '');
+    if (btn.dataset.confirmCancel) confirmCancel(btn.dataset.confirmCancel);
+  });
+
+  document.getElementById('complete-submit-btn').addEventListener('click', async () => {
+    if (!currentTaskId) return;
+    const result = document.getElementById('complete-result').value.trim();
+    if (!result) { showToast('请填写结果'); return; }
+    const evidenceRaw = document.getElementById('complete-evidence').value.trim();
+    const evidence = evidenceRaw ? evidenceRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
+    try {
+      const resp = await fetch(API + '/tasks/' + currentTaskId + '/complete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ result, evidence })
+      });
+      if (resp.ok) { closeModal('complete-modal'); loadTasks(); showToast('✓ 任务已完成'); }
+      else { const b = await resp.json().catch(() => ({})); showToast('失败: ' + (b.error || '未知错误')); }
     } catch (err) { showToast('错误: ' + err.message); }
   });
 
-  document.getElementById('reject-submit-btn').addEventListener('click', async function () {
-    if (!currentTaskId) return;
-    var reason = document.getElementById('reject-reason').value;
-    if (!reason) { showToast('请选择拒绝理由'); return; }
-    var note = document.getElementById('reject-note').value.trim();
+  // Reason button click handler
+  document.getElementById('reject-reasons').addEventListener('click', e => {
+    const btn = e.target.closest('.reason-btn');
+    if (!btn) return;
+    document.querySelectorAll('#reject-reasons .reason-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  });
 
+  document.getElementById('reject-submit-btn').addEventListener('click', async () => {
+    if (!currentTaskId) return;
+    const selected = document.querySelector('#reject-reasons .reason-btn.selected');
+    const reason = selected ? selected.dataset.reason : '';
+    if (!reason) { showToast('请选择理由'); return; }
+    const note = document.getElementById('reject-note').value.trim();
     try {
-      var resp = await fetch(API + '/tasks/' + currentTaskId + '/reject', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: reason, note: note })
+      const resp = await fetch(API + '/tasks/' + currentTaskId + '/reject', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason, note })
       });
-      if (resp.ok) { closeModal('reject-modal'); loadTasks(); showToast('任务已拒绝'); }
-      else { var body = await resp.json().catch(function () { return {}; }); showToast('失败: ' + (body.error || '未知错误')); }
+      if (resp.ok) { closeModal('reject-modal'); loadTasks(); showToast('✗ 任务已拒绝'); }
+      else { const b = await resp.json().catch(() => ({})); showToast('失败: ' + (b.error || '未知错误')); }
     } catch (err) { showToast('错误: ' + err.message); }
   });
 
   async function confirmCancel(taskId) {
     if (!confirm('确认取消此任务？')) return;
     try {
-      var resp = await fetch(API + '/tasks/' + taskId + '/confirm-cancel', { method: 'POST' });
+      const resp = await fetch(API + '/tasks/' + taskId + '/confirm-cancel', { method: 'POST' });
       if (resp.ok) { loadTasks(); showToast('任务已取消'); }
-      else { var body = await resp.json().catch(function () { return {}; }); showToast('失败: ' + (body.error || '未知错误')); }
+      else { const b = await resp.json().catch(() => ({})); showToast('失败: ' + (b.error || '未知错误')); }
     } catch (err) { showToast('错误: ' + err.message); }
   }
 
-  function switchTab(tab) {
-    currentTab = tab;
-    document.querySelectorAll('button[data-tab]').forEach(function (el) {
-      var isActive = el.dataset.tab === tab;
-      el.classList.toggle('active', isActive);
-      el.setAttribute('aria-selected', isActive ? 'true' : 'false');
-    });
-    loadTasks();
-  }
-
-  // ---- Toast (non-intrusive notification) ----
+  // ════════════ Toast ════════════
   function showToast(msg) {
-    var el = document.getElementById('toast');
-    el.textContent = msg;
-    el.classList.add('show');
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
     clearTimeout(el._timeout);
-    el._timeout = setTimeout(function () { el.classList.remove('show'); }, 3000);
+    el._timeout = setTimeout(() => el.classList.remove('show'), 2500);
   }
 
-  // ---- Init ----
+  // ════════════ Init ════════════
   connectWS();
   startPolling();
+  startConvPolling();
 })();
 </script>
 </body>

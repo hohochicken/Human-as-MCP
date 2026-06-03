@@ -123,6 +123,84 @@ async def human_cancel(
     }
 
 
+async def human_wait(
+    task_id: str,
+    timeout: int = 300,
+    *,
+    task_manager: Any = None,
+    register_session: Any = None,
+    unregister_session: Any = None,
+) -> dict:
+    """Wait for a human to complete or reject a pending task.
+
+    Registers an MCP notification listener and blocks until:
+    - The task is resolved (completed/rejected) → returns result immediately
+    - The timeout expires → returns current status with wait_status="timeout"
+
+    Unlike human_poll which returns instantly, this waits for real-time push
+    from the server when a human resolves the task via Dashboard or API.
+
+    Parameters:
+    - task_id: The task ID to wait for (required)
+    - timeout: Max seconds to wait (default 300, clamped to 1..600)
+
+    Returns:
+        Task dict with wait_status field:
+        - "notified" — human responded, result below
+        - "timeout" — no response within timeout, current status below
+        - "already_resolved" — task was already done when we checked
+    """
+    import asyncio
+
+    if task_manager is None:
+        return {"status": "error", "message": "Server not initialized."}
+    if register_session is None or unregister_session is None:
+        return {"status": "error", "message": "Session management not available."}
+
+    # Clamp timeout
+    timeout = max(1, min(timeout, 600))
+
+    # Quick check: is the task even pending?
+    task = await task_manager.get_task(task_id)
+    if task is None:
+        return {"status": "error", "message": f"Task not found: {task_id}"}
+    status = task.get("status")
+    if status != "pending":
+        return {**task, "wait_status": "already_resolved",
+                "message": f"Task already resolved (status={status})."}
+
+    # Determine agent_id from task
+    agent_id = task.get("agent_id", "unknown")
+
+    # Register session queue
+    q = register_session(agent_id)
+
+    try:
+        while True:
+            try:
+                notification = await asyncio.wait_for(q.get(), timeout=timeout)
+            except asyncio.TimeoutError:
+                # Timeout — poll current status
+                task = await task_manager.get_task(task_id)
+                return {
+                    **(task or {}),
+                    "wait_status": "timeout",
+                    "message": f"No human response within {timeout}s.",
+                }
+
+            # Check if this notification is for our task
+            if notification.get("task_id") == task_id:
+                task = await task_manager.get_task(task_id)
+                return {
+                    **(task or {}),
+                    "wait_status": "notified",
+                    "message": "Human responded — result below.",
+                }
+            # Otherwise keep waiting (notification was for another task)
+    finally:
+        unregister_session(agent_id, q)
+
+
 async def human_list_tasks(
     status: str = "pending",
     agent_id: Optional[str] = None,
