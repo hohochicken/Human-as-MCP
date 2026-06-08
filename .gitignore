@@ -24,3 +24,15 @@ data/*.db-shm
 
 # Logs
 *.log
+
+# Temp exploration/analysis scripts
+analyze_*.py
+check_*.py
+full_analysis.py
+explore_*.py
+query_*.py
+verify_*.py
+_*.py
+
+# Round outputs (探索产物)
+round*.md

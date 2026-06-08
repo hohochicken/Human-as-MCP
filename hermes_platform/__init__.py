@@ -1,9 +1,11 @@
 """
 HumanMCP → Hermes Gateway 平台适配器。
 
-Dashboard 操作回调 → Gateway 会话投递 → Agent 实时处理。
-Gateway 启动时自动拉起 HumanMCP 服务。
-支持通过 config 配置工作目录（自动 cd）。
+MCP-Native 集成 (Phase 1 完成):
+  旧路(已删除): Dashboard → WebSocket → Gateway Chat → Markdown 退化
+  新路: Agent → mcp__humanmcp_human_* → JSON-RPC → 0.027s MCP Push
+
+保留功能: 自动拉起 HumanMCP、工作目录切换、Agent回复日志。
 """
 import asyncio
 import contextlib
@@ -19,47 +21,31 @@ from typing import Any, Dict, Optional
 from gateway.config import Platform, PlatformConfig
 from gateway.platforms.base import (
     BasePlatformAdapter,
-    MessageEvent,
-    MessageType,
     SendResult,
 )
 
 logger = logging.getLogger("gateway.platforms.humanmcp")
 
-SESSION_LOG = Path(r"H:\Human\data\session_log.jsonl")
-SESSION_LOG_MAX_LINES = 500
 HUMANMCP_SERVER = r"H:\Human\server\main.py"
 HUMANMCP_URL = "http://127.0.0.1:4350"
 HUMANMCP_PYTHON = r"C:\Python313\python.exe"
 
+# 回复日志（仅记录 Agent 发送的内容，Dashboard 会话面板渲染用）
+REPLY_LOG = Path(r"H:\Human\data\session_log.jsonl")
 
-def _write_session_entry(role: str, text: str, task_id: str = "") -> None:
+
+def _write_reply_log(text: str) -> None:
     try:
-        os.makedirs(SESSION_LOG.parent, exist_ok=True)
+        os.makedirs(REPLY_LOG.parent, exist_ok=True)
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "role": role,
+            "role": "agent",
             "text": text,
-            "task_id": task_id or "",
         }
-        with open(SESSION_LOG, "a", encoding="utf-8") as f:
+        with open(REPLY_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        _trim_session_log()
     except Exception as e:
-        logger.debug("[humanmcp] 写入会话日志失败: %s", e)
-
-
-def _trim_session_log() -> None:
-    try:
-        if not SESSION_LOG.exists():
-            return
-        with open(SESSION_LOG, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        if len(lines) > SESSION_LOG_MAX_LINES:
-            with open(SESSION_LOG, "w", encoding="utf-8") as f:
-                f.writelines(lines[-SESSION_LOG_MAX_LINES:])
-    except Exception:
-        pass
+        logger.debug("[humanmcp] 回复日志写入失败: %s", e)
 
 
 def _is_humanmcp_running() -> bool:
@@ -99,7 +85,7 @@ async def _ensure_humanmcp_running() -> Optional[subprocess.Popen]:
 
 
 class HumanMCPAdapter(BasePlatformAdapter):
-    """HumanMCP WebSocket → Gateway 会话。"""
+    """HumanMCP WebSocket 监听 + Gateway 工作目录管理。"""
 
     def __init__(self, config: PlatformConfig):
         super().__init__(config, Platform("humanmcp"))
@@ -108,6 +94,7 @@ class HumanMCPAdapter(BasePlatformAdapter):
         self._task: Optional[asyncio.Task] = None
         self._proc: Optional[subprocess.Popen] = None
         self._init_done = False
+        self._last_workdir_sent: str = ""
         self.gateway_runner: Any = None
 
     async def connect(self) -> bool:
@@ -161,8 +148,15 @@ class HumanMCPAdapter(BasePlatformAdapter):
 
     async def _send_system_cd(self) -> None:
         """发送 cd 指令到 Agent 会话。"""
+        # 去重
+        if self._workdir == self._last_workdir_sent:
+            return
+        self._last_workdir_sent = self._workdir
+
         logger.info("[humanmcp] 设工作目录: %s", self._workdir)
         from gateway.session import SessionSource
+        from gateway.platforms.base import MessageEvent, MessageType
+
         source = SessionSource(
             platform=Platform("humanmcp"),
             chat_id="humanmcp:dashboard",
@@ -172,15 +166,15 @@ class HumanMCPAdapter(BasePlatformAdapter):
             user_name="HumanMCP",
         )
         event = MessageEvent(
-            text=f"cd {self._workdir}",
+            text=f"切换工作目录:\n```\ncd {self._workdir}\n```",
             message_type=MessageType.TEXT,
             source=source,
             message_id="hmcp_init_cd",
             internal=True,
             auto_skill="humanmcp",
             channel_prompt=(
-                f"[系统指令] 工作目录: {self._workdir}。"
-                f"所有 terminal 操作默认在此目录下执行。"
+                f"工作目录: {self._workdir}。"
+                f"terminal 操作默认在此目录下执行。"
             ),
         )
         try:
@@ -188,89 +182,57 @@ class HumanMCPAdapter(BasePlatformAdapter):
             logger.info("[humanmcp] ✅ cd 指令已发送")
         except Exception as e:
             logger.error("[humanmcp] cd 发送失败: %s", e)
+
     async def _on_callback(self, data: dict) -> None:
         event_type = data.get("type", "")
-
-        # Dashboard 用户输入
-        if event_type == "user_chat":
-            text = data.get("text", "").strip()
-            if text:
-                await self._route_to_gateway(text, task_id="")
-            return
 
         # Dashboard 切换工作目录
         if event_type == "workdir_changed":
             new_dir = data.get("workdir", "")
             if new_dir and new_dir != self._workdir:
                 self._workdir = new_dir
-                self._init_done = False  # 强制重发
+                self._last_workdir_sent = ""  # 强制重发
+                self._init_done = False
                 await self._send_system_cd()
                 self._init_done = True
             return
 
-        if event_type not in ("task_updated", "new_task"):
+        # Dashboard 用户聊天输入 → Gateway（保留，用于手动测试/沟通）
+        if event_type == "user_chat":
+            text = data.get("text", "").strip()
+            if text:
+                from gateway.session import SessionSource
+                from gateway.platforms.base import MessageEvent, MessageType
+                source = SessionSource(
+                    platform=Platform("humanmcp"),
+                    chat_id="humanmcp:dashboard",
+                    chat_name="HumanMCP Dashboard",
+                    chat_type="dm",
+                    user_id="humanmcp",
+                    user_name="HumanMCP",
+                )
+                event = MessageEvent(
+                    text=text,
+                    message_type=MessageType.TEXT,
+                    source=source,
+                    message_id=f"hmcp_chat_{datetime.now(timezone.utc).timestamp()}",
+                    internal=True,
+                    auto_skill="humanmcp",
+                )
+                try:
+                    await self.handle_message(event)
+                except Exception as e:
+                    logger.error("[humanmcp] user_chat 转发失败: %s", e)
             return
 
-        task_id = data.get("task_id", "")
-        status = data.get("status", "")
-        emoji = {"completed": "✅", "rejected": "❌", "modified": "✏️", "cancelled": "🚫"}.get(status, "📨")
-        status_cn = {"completed": "已完成", "rejected": "已拒绝", "modified": "已修改", "cancelled": "已取消"}.get(status, status)
-
-        task_data = data.get("task", {})
-        title = task_data.get("title", "?")
-        agent = task_data.get("agent_id", "?")
-        result = task_data.get("result", "")
-        rejection = task_data.get("rejection_reason", "")
-        rejection_note = task_data.get("rejection_note", "")
-
-        prompt = f"{emoji} **{title}**\n"
-        prompt += f"状态: {status_cn} | 来自: {agent}\n\n"
-        if status == "completed" and result:
-            prompt += f"**结果:** {result}\n"
-        elif status == "rejected":
-            prompt += f"**理由:** {rejection}"
-            if rejection_note:
-                prompt += f" ({rejection_note})"
-            prompt += "\n"
-        prompt += f"task_id: {task_id}"
-
-        await self._route_to_gateway(prompt, task_id)
-
-    async def _route_to_gateway(self, text: str, task_id: str) -> None:
-        from gateway.session import SessionSource
-
-        if not text.startswith("/") and not text.startswith("请将工作目录切换到") and not text.startswith("cd "):
-            _write_session_entry("user", text, task_id)
-
-        source = SessionSource(
-            platform=Platform("humanmcp"),
-            chat_id="humanmcp:dashboard",
-            chat_name="HumanMCP Dashboard",
-            chat_type="dm",
-            user_id="humanmcp",
-            user_name="HumanMCP",
-        )
-
-        event = MessageEvent(
-            text=text,
-            message_type=MessageType.TEXT,
-            source=source,
-            message_id=f"hmcp_{task_id}",
-            internal=True,
-            auto_skill="humanmcp",
-        )
-
-        try:
-            await self.handle_message(event)
-            logger.info("[humanmcp] ✅ 已投递到 Gateway Session")
-        except Exception as e:
-            logger.error("[humanmcp] Gateway 投递失败: %s", e)
+        # task_updated/new_task 已删除: 任务结果现在通过 MCP-Native 直达 Agent。
+        # 不再走 Gateway Chat → Markdown 退化路径。
 
     async def send(self, chat_id: str, content: str,
                    reply_to: Optional[str] = None,
                    metadata: Optional[Dict[str, Any]] = None,
                    **kwargs) -> SendResult:
-        _write_session_entry("agent", content)
+        _write_reply_log(content)
         logger.info("[humanmcp] Agent 回复 (%d chars) → %s", len(content), chat_id)
         return SendResult(success=True)
 
