@@ -219,6 +219,9 @@ async def _inject_piggyback(result: dict, agent_id: str) -> dict:
                 "title": t["title"],
                 "status": t["status"],
                 "completed_at": t.get("completed_at"),
+                "rejection_reason": t.get("rejection_reason"),
+                "rejection_note": t.get("rejection_note"),
+                "result": t.get("result", "")[:200] if t.get("status") == "completed" else None,
             }
             for t in recent
         ]
