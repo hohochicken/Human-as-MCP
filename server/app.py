@@ -357,7 +357,7 @@ async def _with_piggyback(coro) -> dict:
 async def human_action(
     title: str,
     description: str,
-    steps: Optional[list[str]] = None,
+    steps: list[str],
     action_type: str = "other",
     target_person: Optional[str] = None,
     priority: str = "normal",
@@ -391,7 +391,7 @@ async def human_action(
     **参数**
     title: 简短标题（必填，最长200字符）
     description: 完整描述，包含目标和期望结果（必填）
-    steps: 逐步操作说明（可选，AI 能写多细写多细）
+    steps: 逐步操作说明（必填！人类按步骤执行，不需要思考。每步一行，越细越好）
     action_type: operation|command|coordination|build|config|other
     target_person: 协调目标（仅 action_type="coordination" 时相关）
     priority: low|normal|high|critical（默认 normal）

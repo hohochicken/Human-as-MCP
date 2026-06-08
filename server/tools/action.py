@@ -85,6 +85,8 @@ async def human_action(
         return {"status": "error", "message": "title must be a non-empty string."}
     if not description or not description.strip():
         return {"status": "error", "message": "description must be a non-empty string."}
+    if not steps or len(steps) == 0:
+        return {"status": "error", "message": "steps is required for human_action. Provide a step-by-step list so the human can execute without thinking."}
 
     # Normalise action_type — unknown values fall back to "other".
     action_type = action_type.strip().lower() if action_type else "other"
