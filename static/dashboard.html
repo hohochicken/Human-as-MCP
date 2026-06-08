@@ -418,6 +418,40 @@ body {
 .reason-btn.selected { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
 .reason-btn:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
 
+/* Evidence paste zone */
+.paste-zone {
+  width: 100%; min-height: 80px;
+  background: var(--bg-input);
+  border: 2px dashed var(--border-input);
+  border-radius: var(--radius);
+  padding: 8px;
+  cursor: text;
+  transition: all var(--transition);
+  display: flex; flex-wrap: wrap; gap: 6px;
+  align-items: flex-start; align-content: flex-start;
+}
+.paste-zone:focus { outline: none; border-color: var(--accent); }
+.paste-zone .paste-hint {
+  font-size: 12px; color: var(--text-muted);
+  pointer-events: none; width: 100%; text-align: center;
+  padding: 12px 0;
+}
+.paste-zone .evidence-thumb {
+  width: 64px; height: 64px; object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.paste-zone .evidence-text-item {
+  font-size: 12px; font-family: var(--font-mono);
+  color: var(--text-secondary); background: var(--bg-elevated);
+  padding: 4px 8px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  max-width: 100%; word-break: break-all;
+  cursor: default;
+}
+.evidence-optional { display: inline; }
+.evidence-required { display: inline; }
+
 /* ═══════════════════════════════════════════════
    Toast
    ═══════════════════════════════════════════════ */
@@ -518,8 +552,10 @@ body {
     <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:12px;" id="complete-task-title"></div>
     <label>结果 <span style="color:var(--danger)">*</span></label>
     <textarea id="complete-result" rows="3" placeholder="描述执行结果..."></textarea>
-    <label>证据（可选，每行一个路径或链接）</label>
-    <textarea id="complete-evidence" rows="2" placeholder="截图路径"></textarea>
+    <label>证据 <span style="color:var(--danger)" id="evidence-required-star" class="evidence-optional">*</span></label>
+    <div id="evidence-paste-zone" class="paste-zone" contenteditable="false" tabindex="0">
+      <span class="paste-hint">📋 粘贴截图（Ctrl+V）或输入路径</span>
+    </div>
     <div class="btn-row">
       <button class="btn" data-modal-close="complete-modal">取消</button>
       <button class="btn primary" id="complete-submit-btn">提交</button>
@@ -556,6 +592,7 @@ body {
   let currentTab = 'pending';
   let ws = null;
   let currentTaskId = null;
+  let currentTaskTool = '';
   let pollTimer = null;
   let convPollTimer = null;
   let reconnectTimer = null;
@@ -689,7 +726,7 @@ body {
     let actions = '';
     if (!t.cancel_requested) {
       actions = '<div class="task-actions">' +
-        '<button class="btn complete" data-complete="' + escapeHtml(t.task_id) + '" data-title="' + escapeHtml(t.title) + '">✓ 完成</button>' +
+        '<button class="btn complete" data-complete="' + escapeHtml(t.task_id) + '" data-title="' + escapeHtml(t.title) + '" data-tool="' + escapeHtml(t.tool_name) + '">✓ 完成</button>' +
         '<button class="btn reject" data-reject="' + escapeHtml(t.task_id) + '" data-title="' + escapeHtml(t.title) + '">✗ 拒绝</button>' +
         '</div>';
     }
@@ -910,12 +947,25 @@ body {
   });
 
   // ════════════ Modals ════════════
-  function openModal(id, taskId, title) {
+  function openModal(id, taskId, title, toolName) {
     currentTaskId = taskId;
+    currentTaskTool = toolName || '';
     if (id === 'complete-modal') {
       document.getElementById('complete-task-title').textContent = title;
       document.getElementById('complete-result').value = '';
-      document.getElementById('complete-evidence').value = '';
+      // Clear paste zone
+      var pz = document.getElementById('evidence-paste-zone');
+      pz.innerHTML = '<span class=\"paste-hint\">📋 粘贴截图（Ctrl+V）或输入路径</span>';
+      pz._images = [];
+      // Toggle evidence required star based on task type
+      var star = document.getElementById('evidence-required-star');
+      if (toolName === 'human_action') {
+        star.className = 'evidence-required';
+        star.style.display = 'inline';
+      } else {
+        star.className = 'evidence-optional';
+        star.style.display = 'none';
+      }
     }
     if (id === 'reject-modal') {
       document.getElementById('reject-task-title').textContent = title;
@@ -941,7 +991,7 @@ body {
   document.getElementById('task-list').addEventListener('click', e => {
     const btn = e.target.closest('button');
     if (!btn) return;
-    if (btn.dataset.complete) openModal('complete-modal', btn.dataset.complete, btn.dataset.title || '');
+    if (btn.dataset.complete) openModal('complete-modal', btn.dataset.complete, btn.dataset.title || '', btn.dataset.tool || '');
     if (btn.dataset.reject) openModal('reject-modal', btn.dataset.reject, btn.dataset.title || '');
     if (btn.dataset.confirmCancel) confirmCancel(btn.dataset.confirmCancel);
   });
@@ -950,8 +1000,23 @@ body {
     if (!currentTaskId) return;
     const result = document.getElementById('complete-result').value.trim();
     if (!result) { showToast('请填写结果'); return; }
-    const evidenceRaw = document.getElementById('complete-evidence').value.trim();
-    const evidence = evidenceRaw ? evidenceRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
+    // Gather evidence from paste zone: images + text paths
+    const pz = document.getElementById('evidence-paste-zone');
+    const evidence = [];
+    // Collect pasted images (stored as base64 data URIs on the element)
+    if (pz._images && pz._images.length) {
+      pz._images.forEach(function(img) { evidence.push(img); });
+    }
+    // Collect text entries (paths/links typed or pasted as text)
+    const textItems = pz.querySelectorAll('.evidence-text-item');
+    textItems.forEach(function(item) {
+      var t = item.textContent.trim();
+      if (t) evidence.push(t);
+    });
+    // For human_action, evidence is required
+    if (currentTaskTool === 'human_action' && evidence.length === 0) {
+      showToast('请粘贴截图证据（Ctrl+V）或输入路径'); return;
+    }
     try {
       const resp = await fetch(API + '/tasks/' + currentTaskId + '/complete', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1002,6 +1067,77 @@ body {
     clearTimeout(el._timeout);
     el._timeout = setTimeout(() => el.classList.remove('show'), 2500);
   }
+
+  // ════════════ Evidence Paste Zone ════════════
+  var pz = document.getElementById('evidence-paste-zone');
+  pz._images = [];
+  pz.addEventListener('paste', function(e) {
+    var items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      if (item.type.indexOf('image') === 0) {
+        e.preventDefault();
+        var blob = item.getAsFile();
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          var dataUri = ev.target.result;
+          pz._images.push(dataUri);
+          var img = document.createElement('img');
+          img.className = 'evidence-thumb';
+          img.src = dataUri;
+          img.title = '截图 ' + (pz._images.length);
+          pz.appendChild(img);
+          // Hide hint
+          var hint = pz.querySelector('.paste-hint');
+          if (hint) hint.style.display = 'none';
+        };
+        reader.readAsDataURL(blob);
+        return;
+      }
+    }
+    // Text paste: let the browser handle it, then convert to evidence-text-item
+    setTimeout(function() {
+      var textNodes = [];
+      var walk = document.createTreeWalker(pz, NodeFilter.SHOW_TEXT, null, false);
+      var node;
+      while (node = walk.nextNode()) {
+        if (node.parentElement === pz && node.textContent.trim()) {
+          textNodes.push(node);
+        }
+      }
+      textNodes.forEach(function(tn) {
+        var span = document.createElement('span');
+        span.className = 'evidence-text-item';
+        span.textContent = tn.textContent.trim();
+        tn.parentNode.replaceChild(span, tn);
+      });
+      var hint = pz.querySelector('.paste-hint');
+      if (hint && pz.querySelector('.evidence-text-item, .evidence-thumb')) {
+        hint.style.display = 'none';
+      }
+    }, 10);
+  });
+  pz.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Create a text item from any text typed directly
+      var sel = window.getSelection();
+      if (sel.rangeCount && sel.getRangeAt(0).startContainer.parentElement === pz) {
+        var text = pz.textContent.replace(/[\u200B\s]+/g, ' ').trim();
+        if (text) {
+          pz.innerHTML = '';
+          pz._images = [];
+          var span = document.createElement('span');
+          span.className = 'evidence-text-item';
+          span.textContent = text;
+          pz.appendChild(span);
+          var hint = pz.querySelector('.paste-hint');
+          if (hint) hint.style.display = 'none';
+        }
+      }
+    }
+  });
 
   // ════════════ Init ════════════
   connectWS();
