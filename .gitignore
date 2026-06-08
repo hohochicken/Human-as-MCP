@@ -29,6 +29,7 @@ data/*.jsonl
 # Temp exploration/analysis scripts
 analyze_*.py
 check_*.py
+!scripts/check_health.py
 full_analysis.py
 explore_*.py
 query_*.py
