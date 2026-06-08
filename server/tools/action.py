@@ -88,6 +88,12 @@ async def human_action(
     if not steps or len(steps) == 0:
         return {"status": "error", "message": "steps is required for human_action. Provide a step-by-step list so the human can execute without thinking."}
 
+    # Filter out empty/whitespace-only steps
+    clean_steps = [s.strip() for s in steps if s and s.strip()]
+    if len(clean_steps) == 0:
+        return {"status": "error", "message": "steps must contain at least one non-empty step."}
+    steps = clean_steps
+
     # Normalise action_type — unknown values fall back to "other".
     action_type = action_type.strip().lower() if action_type else "other"
     if action_type not in _VALID_ACTION_TYPES:

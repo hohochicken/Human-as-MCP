@@ -628,7 +628,7 @@ body {
   var minimalOff = document.getElementById('minimal-icon-off');
   var convPanel = document.getElementById('conv-panel');
   var mainGrid = document.querySelector('.main');
-  var isMinimal = localStorage.getItem('minimal_mode') === '1';
+  var isMinimal = localStorage.getItem('minimal_mode') !== '0';  // default: minimal ON
 
   function applyMinimal(on) {
     isMinimal = on;
