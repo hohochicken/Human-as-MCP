@@ -7,6 +7,7 @@ import sys
 import time
 import threading
 import urllib.request
+import pytest
 
 sys.path.insert(0, r"H:\Human")
 
@@ -64,6 +65,7 @@ def parse_mcp_result(raw):
     return None
 
 
+@pytest.mark.asyncio
 async def test_e2e():
     print("=" * 65)
     print("  方案B 真·端到端测试")

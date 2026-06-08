@@ -76,6 +76,7 @@ class TestHumanAction:
         result = await human_action(
             title="Restart server",
             description="Please restart the staging server.",
+            steps=["1. Open terminal", "2. Run restart command", "3. Verify server is up"],
             task_manager=mock_task_manager,
             storage=mock_storage,
         )
@@ -99,6 +100,7 @@ class TestHumanAction:
         result = await human_action(
             title="Sync with backend team",
             description="Align API contract for the new endpoint.",
+            steps=["1. Contact Zhang San", "2. Align API contract details", "3. Document the agreed contract"],
             action_type="coordination",
             target_person="Zhang San",
             task_manager=mock_task_manager,
