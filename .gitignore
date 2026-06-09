@@ -2,12 +2,29 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
-dist/
-.pytest_cache/
 
-# Virtual env
-venv/
-.venv/
+# Runtime data (database, logs)
+data/
+
+# Temporary test scripts (development artifacts)
+ai_test*.py
+test_notify.py
+get_taskid.py
+check_db.py
+verify_*.py
+
+# Temp analysis/exploration scripts (cron agent artifacts at project root)
+/_*.py
+/analyze_*.py
+/check_db*.py
+/check_latency.py
+/check_notify.py
+/check_pending.py
+/check_sort.py
+/check_task_*.py
+/check_tasks_db.py
+/explore_*.py
+/full_analysis.py
 
 # IDE
 .vscode/
@@ -16,25 +33,3 @@ venv/
 # OS
 Thumbs.db
 .DS_Store
-
-# Data
-data/*.db
-data/*.db-wal
-data/*.db-shm
-data/*.jsonl
-
-# Logs
-*.log
-
-# Temp exploration/analysis scripts
-analyze_*.py
-check_*.py
-!scripts/check_health.py
-full_analysis.py
-explore_*.py
-query_*.py
-verify_*.py
-_*.py
-
-# Round outputs (探索产物)
-round*.md
