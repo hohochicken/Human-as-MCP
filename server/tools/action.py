@@ -56,8 +56,8 @@ async def human_action(
     steps : list[str], optional
         Step-by-step instructions for completing the task.
     action_type : str
-        One of ``editor_operation``, ``version_control``, ``build``, ``config``,
-        ``coordination``, ``command``, or ``other``.  Default ``"other"``.
+        One of ``operation``, ``editor_operation``, ``version_control``, ``build``,
+        ``config``, ``coordination``, ``command``, or ``other``.  Default ``"other"``.
     target_person : str, optional
         Who to coordinate with (only relevant for ``action_type="coordination"``).
     priority : str
