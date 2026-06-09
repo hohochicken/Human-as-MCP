@@ -16,6 +16,7 @@ from server.task_pipeline import run_pipeline
 logger = logging.getLogger(__name__)
 
 _VALID_ACTION_TYPES = frozenset({
+    "operation",
     "editor_operation",
     "version_control",
     "build",
