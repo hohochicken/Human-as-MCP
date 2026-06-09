@@ -195,6 +195,9 @@ async def run_pipeline(
         "sync": False,
         "message": (
             f"Task queued (no response within {BLOCK_TIMEOUT}s). "
-            f"Poll with human_poll('{task_id}') or human_poll_batch(['{task_id}']) for the result."
+            f"You MUST call human_wait('{task_id}', timeout=300) to receive the result in real-time. "
+            f"The server will push the result to you the moment the human completes the task. "
+            f"Do NOT use human_poll for this — human_wait is faster and uses fewer tokens."
         ),
+        "required_action": f"human_wait('{task_id}', timeout=300)",
     }

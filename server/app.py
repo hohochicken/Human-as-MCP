@@ -622,9 +622,11 @@ async def human_wait(
 ) -> dict:
     """Wait for a human to complete or reject a pending task.
 
-    **用途** — 人类已离线，但你想第一时间拿到结果时使用
+    **用途** — 派发任务后必须调用，确保 5 分钟内感知人类响应
     派发 human_action/human_decision/human_information 后，如果返回
-    sync=false（人类不在 180s 窗口内响应），调用 human_wait 阻塞等待。
+    sync=false（人类不在 180s 窗口内响应），**必须**调用 human_wait 等待。
+    
+    **⚠️ 不要跳过这一步** — 如果你不调 human_wait，就永远不会知道人类做了没有。
 
     **工作方式**
     在服务端注册一个通知监听器，人类通过 Dashboard 完成任务时，服务端

@@ -185,7 +185,13 @@ async def human_wait(
                 return {
                     **(task or {}),
                     "wait_status": "timeout",
-                    "message": f"No human response within {timeout}s.",
+                    "message": (
+                        f"No human response within {timeout}s. "
+                        f"Current status: {task.get('status', 'unknown') if task else 'not_found'}. "
+                        f"If still pending, the human may be away. Consider: "
+                        f"(1) call human_poll('{task_id}') to check final status, "
+                        f"(2) call human_cancel('{task_id}') if no longer needed."
+                    ),
                 }
 
             # Check if this notification is for our task
