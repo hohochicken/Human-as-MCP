@@ -58,6 +58,12 @@ async def human_decision(
     if not options or len(options) < 2:
         return {"status": "error", "message": "options must contain at least 2 items."}
 
+    # Filter empty/whitespace-only options
+    clean_options = [o.strip() for o in options if o and o.strip()]
+    if len(clean_options) < 2:
+        return {"status": "error", "message": "options must contain at least 2 non-empty items."}
+    options = clean_options
+
     decision_type = decision_type.strip().lower() if decision_type else "other"
     if decision_type not in _VALID_DECISION_TYPES:
         decision_type = "other"
