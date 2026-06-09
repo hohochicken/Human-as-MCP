@@ -200,7 +200,7 @@ body {
 .task-card .task-desc {
   font-size: 13px; color: var(--text-secondary);
   line-height: 1.5; margin: 6px 0; white-space: pre-wrap;
-  max-height: 80px; overflow-y: auto;
+  max-height: 200px; overflow-y: auto;
 }
 .task-card .task-meta {
   font-size: 11px; color: var(--text-tertiary);
@@ -222,6 +222,8 @@ body {
 .badge.completed { background: var(--success-bg); color: var(--success); }
 .badge.rejected { background: var(--danger-bg); color: var(--danger); }
 .badge.cancelled { background: var(--warning-bg); color: var(--warning); }
+.badge.overdue { background: var(--danger-bg); color: var(--danger); font-weight: 600; }
+.badge.deadline-warn { background: var(--warning-bg); color: var(--warning); }
 
 /* ═══════════════════════════════════════════════
    Buttons
@@ -692,7 +694,13 @@ body {
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-        if (msg.type === 'new_task' || msg.type === 'task_updated') {
+        if (msg.type === 'new_task') {
+          if (currentTab === 'pending') loadTasks();
+          // Flash title to alert the human
+          document.title = '🔔 新任务 - HumanMCP';
+          setTimeout(() => { document.title = 'HumanMCP Dashboard'; }, 3000);
+        }
+        if (msg.type === 'task_updated') {
           if (currentTab === 'pending') loadTasks();
         }
       } catch (_) {}
@@ -755,11 +763,26 @@ body {
         '<button class="btn reject" data-reject="' + escapeHtml(t.task_id) + '" data-title="' + escapeHtml(t.title) + '">✗ 拒绝</button>' +
         '</div>';
     }
+    // Deadline indicator
+    let deadlineHtml = '';
+    if (t.deadline_minutes) {
+      const created = new Date(t.created_at).getTime();
+      if (!isNaN(created)) {
+        const deadline = created + t.deadline_minutes * 60000;
+        const remaining = Math.floor((deadline - Date.now()) / 60000);
+        if (remaining < 0) {
+          deadlineHtml = '<span class="badge overdue">⏰ 已过期 ' + Math.abs(remaining) + '分钟</span>';
+        } else if (remaining < 30) {
+          deadlineHtml = '<span class="badge deadline-warn">⏳ 剩余 ' + remaining + '分钟</span>';
+        }
+      }
+    }
     return '<div class="task-card">' +
       '<div class="task-header">' +
         '<span class="badge ' + escapeHtml(t.priority) + '">' + escapeHtml(t.priority) + '</span>' +
         '<span class="badge tool">' + escapeHtml(t.tool_name) + '</span>' +
         cancelHtml +
+        deadlineHtml +
         '<span style="margin-left:auto;font-size:10px;color:var(--text-muted);">' + escapeHtml(t.agent_id) + ' · ' + timeAgo(t.created_at) + '</span>' +
       '</div>' +
       '<div class="task-title">' + escapeHtml(t.title) + '</div>' +

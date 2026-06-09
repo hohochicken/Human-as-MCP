@@ -258,7 +258,13 @@ class Storage:
             conn = self._connect()
             try:
                 return conn.execute(
-                    "SELECT * FROM tasks WHERE status = ? ORDER BY created_at DESC",
+                    "SELECT * FROM tasks WHERE status = ? "
+                    "ORDER BY CASE priority "
+                    "WHEN 'critical' THEN 0 "
+                    "WHEN 'high' THEN 1 "
+                    "WHEN 'normal' THEN 2 "
+                    "WHEN 'low' THEN 3 "
+                    "ELSE 4 END, created_at DESC",
                     (status.value,),
                 ).fetchall()
             finally:
