@@ -36,7 +36,7 @@ def analyze():
     # Recent rejected (last 7 days)
     week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
     c.execute(
-        "SELECT task_id, title, rejection_reason, params_json, created_at, completed_at "
+        "SELECT task_id, title, rejection_reason, tool_name, params_json, created_at, completed_at "
         "FROM tasks WHERE status = 'rejected' AND completed_at > ? ORDER BY completed_at DESC LIMIT 20",
         (week_ago,)
     )
@@ -117,13 +117,7 @@ def analyze():
         for t in results["rejected_recent"]:
             print(f"  [{t['completed_at'][:19]}] {t['task_id'][:12]}... - {t['title'][:60]}")
             print(f"    Reason: {t['rejection_reason']}")
-            # Parse params_json for tool type
-            if t.get("params_json"):
-                try:
-                    params = json.loads(t["params_json"])
-                    print(f"    Tool: {params.get('tool', 'unknown')}")
-                except:
-                    pass
+            print(f"    Tool: {t.get('tool_name') or 'unknown'}")
 
     else:
         print("\nNo rejected tasks in the last 7 days.")
